@@ -1,0 +1,35 @@
+# Virtual environment
+venv/
+.venv/
+
+# Your personal Ghost — NEVER commit this
+ghost/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Temp files from uploads
+/tmp/
+*.tmp
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Environment variables
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
