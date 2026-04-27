@@ -432,21 +432,42 @@ textarea#userInput::placeholder { color: var(--text-dim); }
   margin-top: 40px;
 }
 
-.page-item {
+.page-item:hover, .folder-item:hover {
+  background: var(--surface2);
+  border-color: var(--border);
+}
+
+.tree-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius);
+  padding: 6px 10px;
+  border-radius: 4px;
   cursor: pointer;
   border: 1px solid transparent;
   transition: 0.15s;
   font-size: 13px;
+  user-select: none;
 }
 
-.page-item:hover {
-  background: var(--surface2);
-  border-color: var(--border);
+.folder-item {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.folder-icon {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.page-item {
+  color: var(--text);
+}
+
+.tree-sub-container {
+  border-left: 1px solid var(--border);
+  margin-left: 18px;
+  margin-bottom: 4px;
 }
 
 .page-item.new-flash {

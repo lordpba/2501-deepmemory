@@ -19,6 +19,15 @@ import webbrowser
 from getpass import getpass
 from pathlib import Path
 
+# --- Portable Dependency Support ---
+# If a 'libs' folder exists in the script directory, add it to sys.path.
+# This allows carrying dependencies on USB sticks (FAT32/exFAT) where venv symlinks fail.
+script_dir = Path(__file__).parent.absolute()
+libs_dir = script_dir / "libs"
+if libs_dir.exists():
+    sys.path.insert(0, str(libs_dir))
+# ----------------------------------
+
 from core.ghost import Ghost, WrongPasswordError
 from core import llm
 
@@ -102,7 +111,7 @@ def deploy_to_usb(source_dir: Path):
         
         # Files to copy
         to_copy = [
-            "2501.py", "run.sh", "core", "ui", "ghost_instructions.md", 
+            "2501.py", "run.sh", "run.bat", "core", "ui", "ghost_instructions.md", 
             "requirements.txt", "ghost", "name_your_ghost.png", "The Abstraction Fallacy.pdf", "README.md",
             "ui/static/favicon.png"
         ]
@@ -130,9 +139,10 @@ def deploy_to_usb(source_dir: Path):
             return None
         
         print("\n  ✅ Deployment complete!")
-        print(f"  You can now take the USB stick and run it with:")
-        print(f"     cd {target_dir}")
-        print(f"     bash run.sh")
+        print(f"\n  To use your Ghost from the USB stick:")
+        print(f"  - On LINUX:   Open terminal in {target_dir} and run: bash run.sh")
+        print(f"  - On WINDOWS: Double-click run.bat in the USB folder")
+        print(f"\n  Your memories, settings, and API keys are now safe on your USB stick.")
         return target_dir
     except (ValueError, IndexError):
         print("  Invalid choice.")
@@ -222,15 +232,18 @@ def main():
 
     # Check for deployment
     if args.deploy:
-        deploy_to_usb(script_dir)
-        sys.exit(0)
+        if deploy_to_usb(script_dir):
+            sys.exit(0)
+        # If deployment failed/cancelled, we could either exit or continue. Let's exit.
+        sys.exit(1)
 
-    # Auto-ask for deployment if not on a USB (heuristic: not in /media or /run/media)
+    # Auto-ask for deployment if not on a USB
     if "/media/" not in str(script_dir) and "/run/media/" not in str(script_dir):
         ans = input("  Do you want to deploy this 2501 to a USB stick? (y/N): ").strip().lower()
         if ans == "y":
-            deploy_to_usb(script_dir)
-            # We continue after deployment, or we could exit. Let's continue.
+            if deploy_to_usb(script_dir):
+                print("\n  Exiting. Connect your USB stick to any computer and follow the instructions above.")
+                sys.exit(0)
 
     # Resolve Ghost directory
     if args.ghost:
@@ -286,9 +299,9 @@ def main():
     print(f"  Interface     →  http://localhost:{args.port}")
     print(f"\n  Press Ctrl+C to stop and lock your Ghost.\n")
 
-    # Open browser after a short delay
+    # Open browser after a delay (longer on USB to ensure backend is ready)
     def open_browser():
-        time.sleep(1.5)
+        time.sleep(4.0)
         webbrowser.open(f"http://localhost:{args.port}")
 
     threading.Thread(target=open_browser, daemon=True).start()

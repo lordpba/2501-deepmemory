@@ -491,15 +491,65 @@ function renderPageList(pages) {
     return;
   }
 
-  const icons = {index: '🗂', log: '📋'};
-  const defaultIcon = '📄';
+  // Build tree structure from flat list (split by '-')
+  const tree = {};
+  pages.forEach(name => {
+    const parts = name.split('-');
+    let current = tree;
+    parts.forEach((part, i) => {
+      if (i === parts.length - 1) {
+        current[part] = { _isPage: true, fullName: name };
+      } else {
+        if (!current[part]) current[part] = {};
+        current = current[part];
+      }
+    });
+  });
 
-  pageList.innerHTML = pages.map(name => `
-    <div class="page-item" id="page-item-${name}" onclick="openPage('${name}')">
-      <span class="page-icon">${icons[name] || defaultIcon}</span>
-      <span class="page-name">${name}</span>
-    </div>
-  `).join('');
+  pageList.innerHTML = '';
+  renderTree(tree, pageList, 0);
+}
+
+function renderTree(node, container, depth) {
+  const sortedKeys = Object.keys(node).sort((a, b) => {
+    const aIsPage = node[a]._isPage;
+    const bIsPage = node[b]._isPage;
+    if (aIsPage !== bIsPage) return aIsPage ? 1 : -1;
+    return a.localeCompare(b);
+  });
+
+  sortedKeys.forEach(key => {
+    const item = node[key];
+    const el = document.createElement('div');
+    el.className = 'tree-item';
+    el.style.paddingLeft = `${depth * 12 + 10}px`;
+
+    if (item._isPage) {
+      el.classList.add('page-item');
+      el.id = `page-item-${item.fullName}`;
+      const icon = (item.fullName === 'index' || item.fullName === 'log') ? '🔖' : '📄';
+      el.innerHTML = `<span class="page-icon">${icon}</span><span class="page-name">${key}</span>`;
+      el.onclick = () => openPage(item.fullName);
+    } else {
+      el.classList.add('folder-item');
+      el.innerHTML = `<span class="folder-icon">📂</span><span class="folder-name">${key}</span>`;
+      const subContainer = document.createElement('div');
+      subContainer.className = 'tree-sub-container';
+      
+      el.onclick = (e) => {
+        e.stopPropagation();
+        const isOpen = subContainer.style.display !== 'none';
+        subContainer.style.display = isOpen ? 'none' : 'block';
+        el.querySelector('.folder-icon').textContent = isOpen ? '📁' : '📂';
+      };
+      
+      container.appendChild(el);
+      container.appendChild(subContainer);
+      renderTree(item, subContainer, depth + 1);
+      return;
+    }
+    container.appendChild(el);
+  });
 }
 
 function filterPages() {

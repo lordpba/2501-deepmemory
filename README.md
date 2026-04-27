@@ -1,4 +1,5 @@
 # 2501 DeepMemory
+> *Portable, Persistent AI Memory.*
 
 ![2501 Ghost](name_your_ghost.png)
 
@@ -7,118 +8,83 @@
 
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
-ChatGPT doesn't remember you when you move to Claude. Claude doesn't remember you when you try Llama. Every conversation starts from zero. Your memory belongs to their servers, not to you.
+ChatGPT doesn't remember you when you move to Claude. Claude doesn't remember you when you move to Llama. Every conversation starts from zero. Your memory belongs to their servers, not to you.
 
-2501 is different. Your memory — your **Ghost** — lives encrypted in a folder you control (or on a USB stick in your pocket). Plug it into any machine with Ollama, and your AI is there. Switch models whenever you want. The Ghost stays.
+2501 is different. Your memory — your **Ghost** — lives encrypted in a folder you control, or on a **USB stick** in your pocket. Plug it into any machine, and your AI is there. Switch models whenever you want. The Ghost stays.
 
 ---
 
 ## How it works
 
 ```
-your Ghost (encrypted folder / USB)  +  Ollama (any model)  =  your personal AI
+your Ghost (encrypted USB) + LLM (Local/Cloud) = your personal AI
 ```
 
-The Ghost is yours. The machine is just a Shell you borrow.
+The Ghost is yours. The machine is just a **Shell** you borrow.
 
 ---
 
-## Features (v1)
+## Features (v1.1)
 
-- **Persistent memory** — conversations are automatically distilled into a structured knowledge base between pauses
-- **LLM-agnostic** — change model anytime, memory stays intact
-- **Fully local** — nothing leaves your machine without your consent
-- **Multimodal** — send PDFs, images, documents (with vision-capable models)
-- **Transparent memory (xAI)** — see exactly what your AI remembers about you, edit it, delete it. No black boxes.
-- **Ghost viewer** — Obsidian-style wiki of everything your AI knows, with live updates as it writes
-
----
-
-## Wake / Sleep memory cycle
-
-Inspired by how the human brain consolidates memory:
-
-```
-AWAKE   you talk to your Ghost
-          ↓  pause detected (45 seconds)
-        Ghost extracts key memories → writes structured wiki pages
-          ↓  you can watch this happen in real time
-
-SLEEP   (v2) deep consolidation → vector store + knowledge graph
-```
+- **Portable USB Mode** — Auto-deploy the entire system to a USB stick. Works on any machine without installation.
+- **Cross-Platform** — Native launchers for Linux (`run.sh`) and Windows (`run.bat`).
+- **Portable Dependencies** — No more `venv` symlink errors on USB sticks (FAT32/exFAT). Dependencies live in a local `libs` folder.
+- **Multi-Provider LLM** — Use local **Ollama** (including remote LAN endpoints), **OpenAI**, **Google Gemini**, or **Anthropic Claude**.
+- **Secure Key Vault** — Your API keys are stored **encrypted** inside your Ghost. Only you can unlock them.
+- **Hierarchical LLM Wiki** — Obsidian-style tree view. Automatically groups memories into categories (`project`, `knowledge`, `user`).
+- **Multimodal** — Send PDFs, images, and documents for analysis.
+- **Wake/Sleep Cycle** — Automatic memory consolidation after 45 seconds of conversation pause.
 
 ---
 
-## Quick start
+## Quick Start
 
+### 1. Installation
 ```bash
-# 1. Install Ollama → https://ollama.com
-ollama pull llama3.2
-
-# 2. Clone and install dependencies
-git clone https://github.com/YOUR_USERNAME/2501-deepmemory
+# Clone the repository
+git clone https://github.com/lordpba/2501-deepmemory
 cd 2501-deepmemory
-pip install -r requirements.txt
 
-# 3. Run
-python 2501.py
-# OR use the automated launcher:
+# Launch (Linux)
 bash run.sh
+
+# Launch (Windows)
+run.bat
 ```
 
-Opens at **http://localhost:2501**
+### 2. Deployment to USB (Optional)
+Run the script and choose **"Yes"** when asked to deploy to USB. 
+2501 will detect your USB stick, copy all files, and set up a portable environment.
+
+Once deployed, just plug the stick into any computer and run:
+- **Linux**: `bash run.sh`
+- **Windows**: Double-click `run.bat`
 
 ---
 
-## 📂 Example Interaction
+## LLM Configuration
 
-To get started and see how 2501 extracts memories, try uploading the included sample paper:
-**`The Abstraction Fallacy.pdf`**
+You can configure your LLM by clicking the **Settings (gear icon)** in the top right of the UI:
 
-Ask your Ghost: *"Can you summarize this paper and tell me why abstraction can be a fallacy?"* 
-Wait 45 seconds after the response to see your Ghost consolidate this knowledge into your personal Wiki.
-
----
-
-## Using it on a USB stick
-
-Copy the entire project folder to a USB stick. Your Ghost lives in `ghost/` inside that folder — encrypted, portable, yours.
-
-On any machine with Python + Ollama installed:
-
-```bash
-bash run.sh
-```
-
-The launcher will automatically create a virtual environment and install dependencies if they are missing. The machine is just a terminal. Your Ghost is in your pocket.
+- **Ollama**: Specify a local or LAN endpoint (e.g., a DGX server).
+- **Cloud APIs**: Select OpenAI, Gemini, or Claude and enter your API Key.
+- **Ghost Security**: All settings and memories are Fernet-encrypted (AES-128-CBC + HMAC) using your Ghost password.
 
 ---
 
-## The Ghost format
+## The Ghost Structure
 
-Your Ghost is a set of encrypted markdown files. Under the encryption, it's plain text — readable by humans, editable, exportable, compatible with Obsidian/Logseq. Yours forever, independent of any app or service.
-
-Built on [Karpathy's LLM Wiki pattern](https://github.com/karpathy) — a structured, interlinked knowledge base maintained by an AI.
+Your Ghost is a set of encrypted markdown files. Under the encryption, it's plain text — readable by humans, editable, and compatible with Obsidian.
 
 ```
 ghost/
-├── identity/      ← encrypted identity & key material
-├── wiki/          ← your memories as markdown pages
-│   ├── index.md
-│   ├── log.md
-│   └── [topic].md
+├── identity/      ← encrypted identity, config & API keys
+├── wiki/          ← hierarchical memories (Obsidian-style)
+│   ├── project-x.md
+│   ├── knowledge-y.md
+│   └── index.md
 └── sessions/      ← full conversation logs
 ```
-
----
-
-## Roadmap
-
-| Version | Focus |
-|---------|-------|
-| **v1** | Local Ghost, Ollama, wake-cycle memory, file/image ingestion |
-| v2 | Sleep cycle — vector store + knowledge graph (RAG) |
-| v3 | Cloud sync (optional), DID/blockchain identity, USB branding |
 
 ---
 
@@ -128,15 +94,6 @@ Most AI products put the intelligence in the model.
 **2501 puts the intelligence in the memory.**
 
 A small local model with a rich Ghost outperforms a large cloud model with no memory of you. The Ghost is the product. The LLM is just the voice.
-
----
-
-## Contributing
-
-This is early. The concept is the foundation.
-If you think persistent, portable, LLM-agnostic memory is the missing layer of personal AI — open an issue, start a discussion, send a PR.
-
-**The Ghost belongs to everyone.**
 
 ---
 
