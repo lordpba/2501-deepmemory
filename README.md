@@ -1,6 +1,6 @@
 # 2501 DeepMemory
 
-![2501 Ghost](name_your_ghost.png)
+![2501 DeepMemory](banner_2501.png)
 
 > *"Your Ghost travels with you. The Shell is just borrowed."*
 > — inspired by Project 2501, Ghost in the Shell (Masamune Shirow)
@@ -31,6 +31,8 @@ The Ghost is yours. The machine is just a Shell you borrow.
 - **Multimodal** — send PDFs, images, documents (with vision-capable models)
 - **Transparent memory (xAI)** — see exactly what your AI remembers about you, edit it, delete it. No black boxes.
 - **Ghost viewer** — Obsidian-style wiki of everything your AI knows, with live updates as it writes
+
+![Naming your Ghost](name_your_ghost.png)
 
 ---
 
