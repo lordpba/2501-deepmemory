@@ -6,6 +6,7 @@
   <title>2501 DeepMemory</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
 
@@ -74,6 +75,7 @@
         <span class="ghost-title">Ghost</span>
         <div class="ghost-tabs">
           <button class="tab active" id="tabList" onclick="switchTab('list')">Pages</button>
+          <button class="tab" id="tabGraph" onclick="switchTab('graph')">Graph</button>
           <button class="tab" id="tabPage" onclick="switchTab('page')" style="display:none">View</button>
         </div>
         <input type="search" id="pageSearch" placeholder="Search..." oninput="filterPages()">
@@ -99,6 +101,11 @@
           <button onclick="savePage()">Save</button>
           <button onclick="toggleEdit()">Cancel</button>
         </div>
+      </div>
+
+      <!-- Graph view -->
+      <div id="viewGraph" class="ghost-view" style="display:none; padding: 0; overflow: hidden;">
+        <div id="graphContainer" class="graph-container"></div>
       </div>
     </section>
 

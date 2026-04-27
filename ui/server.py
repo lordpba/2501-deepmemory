@@ -208,6 +208,33 @@ async def update_page(name: str, data: dict):
     return {"status": "ok"}
 
 
+@app.get("/api/ghost/graph")
+async def get_graph():
+    ghost: Ghost = _state["ghost"]
+    pages = ghost.list_wiki_pages()
+    
+    nodes = []
+    links = []
+    
+    import re
+    link_pattern = re.compile(r"\[\[([^\]]+)\]\]")
+    
+    for page in pages:
+        nodes.append({"id": page, "label": page})
+        try:
+            content = ghost.read_wiki_page(page)
+            found_links = link_pattern.findall(content)
+            for target in found_links:
+                target_clean = target.strip().lower().replace(" ", "-")
+                # We only add links to existing pages for now
+                if target_clean in pages:
+                    links.append({"source": page, "target": target_clean})
+        except Exception:
+            continue
+            
+    return {"nodes": nodes, "links": links}
+
+
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     """

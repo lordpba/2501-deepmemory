@@ -34,6 +34,7 @@ const pageEditor   = $('pageEditor');
 const editorActions = $('editorActions');
 const currentPageName = $('currentPageName');
 const tabList      = $('tabList');
+const tabGraph     = $('tabGraph');
 const tabPage      = $('tabPage');
 
 // ── Init ───────────────────────────────────
@@ -77,6 +78,9 @@ function handleWsMessage(msg) {
   } else if (msg.type === 'ghost_updated') {
     loadPages();
     flashPages(msg.pages);
+    if ($('viewGraph').style.display !== 'none') {
+      loadGraph();
+    }
   }
 }
 
@@ -477,16 +481,136 @@ function switchTab(tab) {
   if (tab === 'list') {
     $('viewList').style.display = 'block';
     $('viewPage').style.display = 'none';
+    $('viewGraph').style.display = 'none';
     tabList.classList.add('active');
+    tabGraph.classList.remove('active');
     tabPage.classList.remove('active');
     tabPage.style.display = 'none';
+    pageSearch.style.display = 'block';
+  } else if (tab === 'graph') {
+    $('viewList').style.display = 'none';
+    $('viewPage').style.display = 'none';
+    $('viewGraph').style.display = 'block';
+    tabList.classList.remove('active');
+    tabGraph.classList.add('active');
+    tabPage.classList.remove('active');
+    tabPage.style.display = 'none';
+    pageSearch.style.display = 'none';
+    loadGraph();
   } else {
     $('viewList').style.display = 'none';
     $('viewPage').style.display = 'flex';
     $('viewPage').style.flexDirection = 'column';
+    $('viewGraph').style.display = 'none';
     tabList.classList.remove('active');
+    tabGraph.classList.remove('active');
     tabPage.classList.add('active');
     tabPage.style.display = 'inline-block';
+    pageSearch.style.display = 'none';
+  }
+}
+
+// ── Graph rendering (D3.js) ────────────────
+let simulation = null;
+
+async function loadGraph() {
+  try {
+    const r = await fetch('/api/ghost/graph');
+    const data = await r.json();
+    renderGraph(data);
+  } catch (e) {
+    console.error("Graph error:", e);
+  }
+}
+
+function renderGraph(data) {
+  const container = $('graphContainer');
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+
+  // Clear previous
+  container.innerHTML = '';
+
+  const svg = d3.select(container)
+    .append('svg')
+    .attr('width', '100%')
+    .attr('height', '100%')
+    .attr('viewBox', [0, 0, width, height]);
+
+  const g = svg.append('g');
+
+  // Zoom
+  svg.call(d3.zoom().on('zoom', (e) => {
+    g.attr('transform', e.transform);
+  }));
+
+  if (simulation) simulation.stop();
+
+  simulation = d3.forceSimulation(data.nodes)
+    .force('link', d3.forceLink(data.links).id(d => d.id).distance(80))
+    .force('charge', d3.forceManyBody().strength(-150))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('x', d3.forceX(width / 2).strength(0.05))
+    .force('y', d3.forceY(height / 2).strength(0.05));
+
+  const link = g.append('g')
+    .attr('class', 'links')
+    .selectAll('line')
+    .data(data.links)
+    .join('line')
+    .attr('class', 'link');
+
+  const node = g.append('g')
+    .attr('class', 'nodes')
+    .selectAll('g')
+    .data(data.nodes)
+    .join('g')
+    .attr('class', 'node-group')
+    .call(drag(simulation));
+
+  node.append('circle')
+    .attr('class', 'node')
+    .attr('r', d => (d.id === 'index' || d.id === 'log') ? 8 : 5)
+    .attr('fill', d => (d.id === 'index' || d.id === 'log') ? '#a78bfa' : '#7c3aed')
+    .on('click', (e, d) => {
+      openPage(d.id);
+    });
+
+  node.append('text')
+    .attr('class', 'label')
+    .attr('dy', 15)
+    .text(d => d.label);
+
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+
+    node
+      .attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  function drag(sim) {
+    function dragstarted(event) {
+      if (!event.active) sim.alphaTarget(0.3).restart();
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
+    }
+    function dragged(event) {
+      event.subject.fx = event.x;
+      event.subject.fy = event.y;
+    }
+    function dragended(event) {
+      if (!event.active) sim.alphaTarget(0);
+      event.subject.fx = null;
+      event.subject.fy = null;
+    }
+    return d3.drag()
+      .on('start', dragstarted)
+      .on('drag', dragged)
+      .on('end', dragended);
   }
 }
 

@@ -596,5 +596,42 @@ footer {
   75%  { content: '●'; }
 }
 
+/* ── Knowledge Graph ────────────────────────── */
+.graph-container {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  cursor: grab;
+}
+
+.graph-container:active { cursor: grabbing; }
+
+.node {
+  stroke: var(--surface);
+  stroke-width: 1.5px;
+  cursor: pointer;
+}
+
+.node:hover {
+  filter: brightness(1.2);
+}
+
+.link {
+  stroke: var(--border);
+  stroke-opacity: 0.6;
+  stroke-width: 1px;
+}
+
+.label {
+  fill: var(--text-dim);
+  font-size: 10px;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.node.active { stroke: var(--accent); stroke-width: 2.5px; }
+.label.active { fill: var(--text); font-weight: bold; }
+
 /* Scrollbars global */
 * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
