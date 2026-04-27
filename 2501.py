@@ -104,7 +104,7 @@ def deploy_to_usb(source_dir: Path):
         to_copy = [
             "2501.py", "run.sh", "core", "ui", "ghost_instructions.md", 
             "requirements.txt", "ghost", "name_your_ghost.png", "The Abstraction Fallacy.pdf", "README.md",
-            "ui/static/favicon.png", "banner_2501.png"
+            "ui/static/favicon.png"
         ]
         
         try:
@@ -229,10 +229,8 @@ def main():
     if "/media/" not in str(script_dir) and "/run/media/" not in str(script_dir):
         ans = input("  Do you want to deploy this 2501 to a USB stick? (y/N): ").strip().lower()
         if ans == "y":
-            target = deploy_to_usb(script_dir)
-            if target:
-                print("\n  Closing local Shell. Please use the USB stick to continue.")
-                sys.exit(0)
+            deploy_to_usb(script_dir)
+            # We continue after deployment, or we could exit. Let's continue.
 
     # Resolve Ghost directory
     if args.ghost:
