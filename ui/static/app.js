@@ -41,9 +41,11 @@ const tabPage      = $('tabPage');
 window.addEventListener('DOMContentLoaded', async () => {
   setupWebSocket();
   await loadStatus();
+  await loadConfig(); // Load LLM config
   await loadModels();
   await loadPages();
   setupInputHandlers();
+  setupConfigHandlers();
 });
 
 // ── WebSocket ──────────────────────────────
@@ -128,6 +130,70 @@ modelSelect.addEventListener('change', async () => {
     body: JSON.stringify({model: modelSelect.value}),
   });
 });
+
+// ── Configuration ──────────────────────────
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    const data = await r.json();
+    if (data.provider) {
+      $('configProvider').value = data.provider;
+      $('configOllamaBase').value = data.ollama_base || '';
+      $('configApiKey').value = data.api_key || '';
+      toggleConfigFields(data.provider);
+    }
+  } catch {}
+}
+
+function setupConfigHandlers() {
+  $('configBtn').addEventListener('click', () => {
+    $('configModal').classList.add('active');
+  });
+
+  $('configProvider').addEventListener('change', (e) => {
+    toggleConfigFields(e.target.value);
+  });
+}
+
+function toggleConfigFields(provider) {
+  if (provider === 'ollama') {
+    $('ollamaFields').style.display = 'block';
+    $('apiFields').style.display = 'none';
+  } else {
+    $('ollamaFields').style.display = 'none';
+    $('apiFields').style.display = 'block';
+  }
+}
+
+async function saveConfig() {
+  const provider = $('configProvider').value;
+  const config = {
+    provider: provider,
+    ollama_base: $('configOllamaBase').value,
+    api_key: $('configApiKey').value
+  };
+
+  setActivity('Updating configuration...', true);
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(config),
+    });
+    const data = await r.json();
+    if (data.status === 'ok') {
+      closeModal('configModal');
+      await loadModels(); // Refresh models for the new provider/endpoint
+      setActivity('Configuration updated.');
+    }
+  } catch (e) {
+    setActivity(`⚠ Config update failed: ${e.message}`);
+  }
+}
+
+function closeModal(id) {
+  $(id).classList.remove('active');
+}
 
 // ── Input handlers ─────────────────────────
 function setupInputHandlers() {

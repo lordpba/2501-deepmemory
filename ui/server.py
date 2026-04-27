@@ -33,6 +33,7 @@ _state: dict = {
     "extractor": None,
     "ws_clients": set(),
     "extracting": False,
+    "llm_config": {},  # provider, ollama_base, api_key
 }
 
 
@@ -91,21 +92,32 @@ async def status():
     }
 
 
+@app.get("/api/config")
+async def get_config():
+    return _state["llm_config"]
+
+
+@app.post("/api/config")
+async def update_config(data: dict):
+    _state["llm_config"] = data
+    ghost: Ghost = _state["ghost"]
+    if ghost:
+        ghost.write_config({"llm_config": data})
+    return {"status": "ok"}
+
+
 @app.get("/api/models")
 async def get_models():
     try:
-        models = await llm.detect_models()
+        models = await llm.detect_models(_state["llm_config"])
         return {"models": models, "current": _state["model"]}
-    except httpx.ConnectError:
-        return {"models": [], "error": "Ollama not reachable at localhost:11434"}
+    except Exception as e:
+        return {"models": [], "error": str(e)}
 
 
 @app.post("/api/model")
 async def set_model(data: dict):
     _state["model"] = data["model"]
-    extractor: MemoryExtractor = _state["extractor"]
-    if extractor:
-        extractor.model = data["model"]
     return {"model": _state["model"]}
 
 
@@ -139,9 +151,8 @@ async def chat_endpoint(data: dict):
             session.to_llm_format(),
             context=context,
             images=images if images else None,
+            config=_state["llm_config"]
         )
-    except httpx.ConnectError:
-        reply = "⚠ Cannot reach Ollama. Is it running? (`ollama serve`)"
     except Exception as e:
         reply = f"⚠ LLM error: {e}"
 
@@ -175,6 +186,10 @@ async def extract_memories():
         await broadcast({"type": "activity", "message": msg})
 
     try:
+        # Update extractor with latest state
+        extractor.model = _state["model"]
+        extractor.config = _state["llm_config"]
+        
         written = await extractor.extract(unextracted, on_progress=progress)
         session.mark_extracted()
         if written:
@@ -304,7 +319,17 @@ def start(ghost: Ghost, model: str, instructions: str, port: int = 2501):
     _state["ghost"] = ghost
     _state["model"] = model
     _state["instructions"] = instructions
+    
+    # Load config from Ghost if present
+    stored = ghost.read_config()
+    if stored and "llm_config" in stored:
+        _state["llm_config"] = stored["llm_config"]
+    else:
+        # Default config
+        _state["llm_config"] = {"provider": "ollama", "ollama_base": "http://localhost:11434"}
+
     _state["session"] = Session(ghost)
     _state["extractor"] = MemoryExtractor(ghost, model, instructions)
+    _state["extractor"].config = _state["llm_config"]
 
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

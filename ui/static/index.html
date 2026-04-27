@@ -23,6 +23,12 @@
         <span id="ghostName">Ghost</span>
       </span>
       <select id="modelSelect" title="Active model"></select>
+      <button id="configBtn" class="icon-btn" title="Settings">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -119,6 +125,41 @@
       <span id="activityText">Ready</span>
     </div>
   </footer>
+
+  <!-- Config Modal -->
+  <div id="configModal" class="modal">
+    <div class="modal-content">
+      <h2>LLM Configuration</h2>
+      <div class="form-group">
+        <label>Provider</label>
+        <select id="configProvider">
+          <option value="ollama">Ollama (Local/LAN)</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="claude">Anthropic Claude</option>
+        </select>
+      </div>
+
+      <div id="ollamaFields">
+        <div class="form-group">
+          <label>Ollama Endpoint</label>
+          <input type="text" id="configOllamaBase" placeholder="http://localhost:11434">
+        </div>
+      </div>
+
+      <div id="apiFields" style="display:none">
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="configApiKey" placeholder="sk-...">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button onclick="saveConfig()" class="primary-btn">Save & Refresh</button>
+        <button onclick="closeModal('configModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js?v=2"></script>
 </body>

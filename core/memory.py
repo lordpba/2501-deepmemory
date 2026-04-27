@@ -18,6 +18,7 @@ class MemoryExtractor:
         self.ghost = ghost
         self.model = model
         self.instructions = instructions
+        self.config = {}
 
     async def extract(
         self,
@@ -39,7 +40,7 @@ class MemoryExtractor:
 
         existing = self.ghost.list_wiki_pages()
         pages = await llm.extract_memories(
-            self.model, conversation, self.instructions, existing_pages=existing
+            self.model, conversation, self.instructions, existing_pages=existing, config=self.config
         )
 
         if not pages:
