@@ -103,7 +103,8 @@ def deploy_to_usb(source_dir: Path):
         # Files to copy
         to_copy = [
             "2501.py", "run.sh", "core", "ui", "ghost_instructions.md", 
-            "requirements.txt", "ghost", "name_your_ghost.png", "The Abstraction Fallacy.pdf", "README.md"
+            "requirements.txt", "ghost", "name_your_ghost.png", "The Abstraction Fallacy.pdf", "README.md",
+            "ui/static/favicon.png"
         ]
         
         try:
