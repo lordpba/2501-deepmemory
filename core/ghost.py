@@ -144,6 +144,19 @@ class Ghost:
                 pass
         return result
 
+    def read_config(self) -> dict | None:
+        """Read configuration from identity/config.json.enc."""
+        try:
+            data = self._read("identity/config.json")
+            return json.loads(data)
+        except (FileNotFoundError, Exception):
+            return None
+
+    def write_config(self, config: dict):
+        """Write configuration to identity/config.json.enc."""
+        data = json.dumps(config, ensure_ascii=False, indent=2).encode("utf-8")
+        self._write("identity/config.json", data)
+
     # ------------------------------------------------------------------
     # Low-level encrypted I/O
     # ------------------------------------------------------------------

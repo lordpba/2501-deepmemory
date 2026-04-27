@@ -1,5 +1,7 @@
 # 2501 DeepMemory
 
+![2501 Ghost](name_your_ghost.png)
+
 > *"Your Ghost travels with you. The Shell is just borrowed."*
 > — inspired by Project 2501, Ghost in the Shell (Masamune Shirow)
 
@@ -60,9 +62,21 @@ pip install -r requirements.txt
 
 # 3. Run
 python 2501.py
+# OR use the automated launcher:
+bash run.sh
 ```
 
 Opens at **http://localhost:2501**
+
+---
+
+## 📂 Example Interaction
+
+To get started and see how 2501 extracts memories, try uploading the included sample paper:
+**`The Abstraction Fallacy.pdf`**
+
+Ask your Ghost: *"Can you summarize this paper and tell me why abstraction can be a fallacy?"* 
+Wait 45 seconds after the response to see your Ghost consolidate this knowledge into your personal Wiki.
 
 ---
 
@@ -73,10 +87,10 @@ Copy the entire project folder to a USB stick. Your Ghost lives in `ghost/` insi
 On any machine with Python + Ollama installed:
 
 ```bash
-python 2501.py
+bash run.sh
 ```
 
-The machine is just a terminal. Your Ghost is in your pocket.
+The launcher will automatically create a virtual environment and install dependencies if they are missing. The machine is just a terminal. Your Ghost is in your pocket.
 
 ---
 
