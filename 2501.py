@@ -229,8 +229,10 @@ def main():
     if "/media/" not in str(script_dir) and "/run/media/" not in str(script_dir):
         ans = input("  Do you want to deploy this 2501 to a USB stick? (y/N): ").strip().lower()
         if ans == "y":
-            deploy_to_usb(script_dir)
-            # We continue after deployment, or we could exit. Let's continue.
+            target = deploy_to_usb(script_dir)
+            if target:
+                print("\n  Closing local Shell. Please use the USB stick to continue.")
+                sys.exit(0)
 
     # Resolve Ghost directory
     if args.ghost:
