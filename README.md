@@ -24,7 +24,7 @@ The Ghost is yours. The machine is just a **Shell** you borrow.
 
 ---
 
-## Features (v1.1)
+## Features (v1.1.0)
 
 - **Portable USB Mode** — Auto-deploy the entire system to a USB stick. Works on any machine without installation.
 - **Cross-Platform** — Native launchers for Linux (`run.sh`) and Windows (`run.bat`).
@@ -59,6 +59,13 @@ Run the script and choose **"Yes"** when asked to deploy to USB.
 Once deployed, just plug the stick into any computer and run:
 - **Linux**: `bash run.sh`
 - **Windows**: Double-click `run.bat`
+
+### 3. Syncing from USB to Desktop
+If you use your Ghost on the go via a USB stick, its memories will evolve independently. To synchronize the newly learned memories from the USB back to your primary Desktop Ghost, run:
+```bash
+python 2501.py --sync-from-usb
+```
+*Note: For security, you will be asked for the Desktop Ghost's password before the sync can overwrite your local data.*
 
 ---
 

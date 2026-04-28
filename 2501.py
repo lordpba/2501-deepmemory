@@ -31,14 +31,16 @@ if libs_dir.exists():
 from core.ghost import Ghost, WrongPasswordError
 from core import llm
 
-BANNER = r"""
+VERSION = "1.1.0"
+
+BANNER = f"""
   ██████╗ ███████╗ ██████╗  ██╗
   ╚════██╗██╔════╝██╔═████╗███║
    █████╔╝███████╗██║██╔██║╚██║
   ██╔═══╝ ╚════██║████╔╝██║ ██║
   ███████╗███████║╚██████╔╝ ██║
   ╚══════╝╚══════╝ ╚═════╝  ╚═╝
-  DeepMemory v1 - Portable
+  DeepMemory v{VERSION} - Portable
 """
 
 
@@ -47,6 +49,7 @@ def parse_args():
     p.add_argument("--port", type=int, default=2501, help="UI port (default: 2501)")
     p.add_argument("--ghost", type=str, default=None, help="Path to Ghost directory")
     p.add_argument("--deploy", action="store_true", help="Force deployment to USB")
+    p.add_argument("--sync-from-usb", action="store_true", help="Pull Ghost data from USB to Desktop")
     return p.parse_args()
 
 
@@ -97,14 +100,39 @@ def deploy_to_usb(source_dir: Path):
         target_base = drives[int(choice) - 1]
         target_dir = target_base / "2501-DeepMemory"
         
+        is_update = False
+        
         if target_dir.exists():
-            confirm = input(f"\n  Folder '{target_dir.name}' already exists. Overwrite? (y/N): ").strip().lower()
-            if confirm != "y":
-                return None
-            try:
-                shutil.rmtree(target_dir)
-            except OSError as e:
-                print(f"\n  ❌ Error removing existing folder: {e}")
+            print(f"\n  Folder '{target_dir.name}' already exists on USB.")
+            action = input("  Do you want to [U]pdate code only, [O]verwrite all, or [C]ancel? (U/o/c): ").strip().lower()
+            
+            if action == 'u' or action == '':
+                is_update = True
+                # Remove old core/ui to prevent stale files
+                for d in ["core", "ui"]:
+                    old_dir = target_dir / d
+                    if old_dir.exists():
+                        try:
+                            shutil.rmtree(old_dir)
+                        except OSError as e:
+                            pass
+            elif action == 'o':
+                target_ghost = target_dir / "ghost"
+                if target_ghost.exists():
+                    print("\n  ⚠️ You are about to overwrite and DESTROY the Ghost on the USB.")
+                    pwd = getpass("  Enter USB Ghost password to confirm: ")
+                    try:
+                        from core.ghost import Ghost
+                        Ghost.unlock(str(target_ghost), pwd)
+                    except Exception:
+                        print("  ❌ Wrong password. Deployment cancelled.")
+                        return None
+                try:
+                    shutil.rmtree(target_dir)
+                except OSError as e:
+                    print(f"\n  ❌ Error removing existing folder: {e}")
+                    return None
+            else:
                 return None
 
         print(f"\n  Deploying to {target_dir}...")
@@ -112,9 +140,12 @@ def deploy_to_usb(source_dir: Path):
         # Files to copy
         to_copy = [
             "2501.py", "run.sh", "run.bat", "core", "ui", "ghost_instructions.md", 
-            "requirements.txt", "ghost", "name_your_ghost.png", "The Abstraction Fallacy.pdf", "README.md",
+            "requirements.txt", "name_your_ghost.png", "The Abstraction Fallacy.pdf", "README.md",
             "ui/static/favicon.png"
         ]
+        
+        if not is_update:
+            to_copy.append("ghost")
         
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -147,6 +178,50 @@ def deploy_to_usb(source_dir: Path):
     except (ValueError, IndexError):
         print("  Invalid choice.")
         return None
+
+
+def sync_from_usb(dest_dir: Path):
+    """Pull Ghost data from USB to Desktop."""
+    drives = get_usb_drives()
+    if not drives:
+        print("\n  ⚠ No writable USB drives detected.")
+        return
+        
+    print("\n  Select USB drive to sync from:")
+    for i, d in enumerate(drives, 1):
+        print(f"  [{i}] {d}")
+        
+    choice = input(f"\n  Choose drive [1-{len(drives)}] or Enter to cancel: ").strip()
+    if not choice:
+        return
+        
+    try:
+        source_base = drives[int(choice) - 1]
+        source_ghost = source_base / "2501-DeepMemory" / "ghost"
+        
+        if not source_ghost.exists():
+            print(f"\n  ❌ No Ghost found on {source_base}/2501-DeepMemory/ghost")
+            return
+            
+        dest_ghost = dest_dir / "ghost"
+        if dest_ghost.exists():
+            print("\n  ⚠️ This will overwrite your Desktop Ghost with the USB Ghost.")
+            pwd = getpass("  Enter Desktop Ghost password to confirm: ")
+            try:
+                from core.ghost import Ghost
+                Ghost.unlock(str(dest_ghost), pwd)
+            except Exception:
+                print("  ❌ Wrong password. Sync cancelled.")
+                return
+                
+            shutil.rmtree(dest_ghost)
+            
+        print(f"\n  Syncing Ghost from {source_ghost} to {dest_ghost}...")
+        shutil.copytree(source_ghost, dest_ghost)
+        print("\n  ✅ Sync complete!")
+        
+    except (ValueError, IndexError):
+        print("  Invalid choice.")
 
 
 def setup_ghost(ghost_dir: Path) -> Ghost:
@@ -236,6 +311,11 @@ def main():
             sys.exit(0)
         # If deployment failed/cancelled, we could either exit or continue. Let's exit.
         sys.exit(1)
+
+    # Check for sync from usb
+    if args.sync_from_usb:
+        sync_from_usb(script_dir)
+        sys.exit(0)
 
     # Auto-ask for deployment if not on a USB
     if "/media/" not in str(script_dir) and "/run/media/" not in str(script_dir):
