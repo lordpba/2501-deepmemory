@@ -106,12 +106,13 @@ class Ghost:
     # ------------------------------------------------------------------
 
     def list_wiki_pages(self) -> list[str]:
-        """Return page names (without .md extension)."""
+        """Return page names (without .md extension), supporting subdirectories."""
         wiki_dir = self.path / "wiki"
         pages = []
-        for f in wiki_dir.glob("*.md.enc"):
-            # f.name = "something.md.enc" → we want "something"
-            pages.append(f.name[:-7])  # strip ".md.enc" (7 chars)
+        for f in wiki_dir.rglob("*.md.enc"):
+            rel = f.relative_to(wiki_dir)
+            # convert relative path to string and strip .md.enc (7 chars)
+            pages.append(str(rel)[:-7].replace("\\", "/"))
         return sorted(pages)
 
     def read_wiki_page(self, name: str) -> str:

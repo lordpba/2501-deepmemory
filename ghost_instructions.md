@@ -54,19 +54,22 @@ Link to related concepts using [[wiki-links]] throughout the text.
 - [[related-page-2]]
 ```
 
-## Page naming rules
+## Page naming rules (Categorization)
 
-- Lowercase with hyphens only: `mario-caronna`, `project-2501`, `python-preferences`
-- Specific and descriptive
-- For the user's personal profile: `user-profile`
-- For each project: `project-[name]`
-- For preferences on a topic: `preferences-[topic]`
+- Always organize pages into logical folders/categories using a forward slash `/`.
+- Lowercase with hyphens only.
+- Examples of categories: `entities/`, `projects/`, `concepts/`, `preferences/`, `user/`
+- For the user's personal profile: `user/profile`
+- For each project: `projects/[name]`
+- For preferences: `preferences/[topic]`
+- For people/organizations: `entities/[name]`
+- For abstract ideas: `concepts/[idea]`
 
 ## Output format for memory extraction
 
 When asked to extract memories, output pages using this exact format:
 
-<<<PAGE:page-name-here>>>
+<<<PAGE:category/page-name-here>>>
 [full page content following the format above]
 <<<ENDPAGE>>>
 

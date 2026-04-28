@@ -21,6 +21,7 @@ const messages     = $('messages');
 const userInput    = $('userInput');
 const sendBtn      = $('sendBtn');
 const fileInput    = $('fileInput');
+const captureBtn   = $('captureBtn');
 const attachments  = $('attachments');
 const activityText = $('activityText');
 const activityIcon = $('activityIcon');
@@ -220,6 +221,11 @@ function setupInputHandlers() {
     fileInput.value = '';
   });
 
+  // Screen Capture
+  if (captureBtn) {
+    captureBtn.addEventListener('click', captureScreen);
+  }
+
   // Drag and drop on chat area
   messages.addEventListener('dragover', e => {
     e.preventDefault();
@@ -234,6 +240,40 @@ function setupInputHandlers() {
     const file = e.dataTransfer.files[0];
     if (file) await handleFileAttachment(file);
   });
+}
+
+// ── Screen Capture ─────────────────────────
+async function captureScreen() {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    const track = stream.getVideoTracks()[0];
+    
+    // Create a hidden video element to render the stream
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    await video.play();
+
+    // Create a canvas to draw the video frame
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Stop the stream immediately after capture
+    stream.getTracks().forEach(t => t.stop());
+
+    // Convert canvas to File object and attach
+    canvas.toBlob(async blob => {
+      if (blob) {
+        const file = new File([blob], `Screenshot_${new Date().toISOString().replace(/[:.]/g, '-')}.png`, { type: 'image/png' });
+        await handleFileAttachment(file);
+      }
+    }, 'image/png');
+
+  } catch (err) {
+    console.warn("Screen capture cancelled or failed: ", err);
+  }
 }
 
 // ── File handling ──────────────────────────
@@ -491,10 +531,10 @@ function renderPageList(pages) {
     return;
   }
 
-  // Build tree structure from flat list (split by '-')
+  // Build tree structure from flat list (split by '/')
   const tree = {};
   pages.forEach(name => {
-    const parts = name.split('-');
+    const parts = name.split('/');
     let current = tree;
     parts.forEach((part, i) => {
       if (i === parts.length - 1) {
