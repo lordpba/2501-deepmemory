@@ -47,6 +47,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   await loadPages();
   setupInputHandlers();
   setupConfigHandlers();
+
+  // Auto-greet on fresh startup
+  const isFreshStart = messages.querySelectorAll('.message:not(.welcome)').length === 0;
+  if (isFreshStart) {
+    setTimeout(() => {
+      messages.innerHTML = ''; // Remove the hardcoded welcome message
+      sendMessage("ciao", true);
+    }, 500);
+  }
 });
 
 // ── WebSocket ──────────────────────────────
@@ -94,8 +103,10 @@ async function loadStatus() {
     const data = await r.json();
     if (data.ghost_name) {
       ghostName.textContent = data.ghost_name;
-      $('welcomeMsg').textContent =
-        `Hello, ${data.ghost_name}. I'm your Ghost. What's on your mind?`;
+      const welcome = $('welcomeMsg');
+      if (welcome) {
+        welcome.textContent = `Hello, ${data.ghost_name}. I'm your Ghost. What's on your mind?`;
+      }
     }
     if (!data.model) {
       ghostDot.classList.add('offline');
@@ -336,32 +347,36 @@ function removeAttachment(el) {
 }
 
 // ── Chat ───────────────────────────────────
-async function sendMessage() {
-  const text = userInput.value.trim();
+async function sendMessage(overrideText = null, hidden = false) {
+  const text = typeof overrideText === 'string' ? overrideText : userInput.value.trim();
   if ((!text && state.pendingAttachments.length === 0) || state.isLoading) return;
 
   // Build display content
   let displayContent = text;
-  const attachLabels = state.pendingAttachments.map(a => a.filename);
+  const attachLabels = hidden ? [] : state.pendingAttachments.map(a => a.filename);
 
   // Collect payload data
-  const injectedTexts = state.pendingAttachments
+  const injectedTexts = hidden ? "" : state.pendingAttachments
     .filter(a => a.type === 'text')
     .map(a => `[File: ${a.filename}]\n${a.content}`)
     .join('\n\n---\n\n');
 
-  const imagePaths = state.pendingAttachments
+  const imagePaths = hidden ? [] : state.pendingAttachments
     .filter(a => a.type === 'image')
     .map(a => a.path);
 
   // Render user message
-  appendMessage('user', displayContent, attachLabels);
+  if (!hidden) {
+    appendMessage('user', displayContent, attachLabels);
+  }
 
   // Clear input
-  userInput.value = '';
-  userInput.style.height = 'auto';
-  state.pendingAttachments = [];
-  attachments.innerHTML = '';
+  if (overrideText === null) {
+    userInput.value = '';
+    userInput.style.height = 'auto';
+    state.pendingAttachments = [];
+    attachments.innerHTML = '';
+  }
 
   // Show typing indicator
   const typingEl = appendMessage('assistant', '', [], true);
@@ -576,9 +591,10 @@ function renderTree(node, container, depth) {
       el.onclick = () => openPage(item.fullName);
     } else {
       el.classList.add('folder-item');
-      el.innerHTML = `<span class="folder-icon">📂</span><span class="folder-name">${key}</span>`;
+      el.innerHTML = `<span class="folder-icon">📁</span><span class="folder-name">${key}</span>`;
       const subContainer = document.createElement('div');
       subContainer.className = 'tree-sub-container';
+      subContainer.style.display = 'none'; // Collapsed by default
       
       el.onclick = (e) => {
         e.stopPropagation();
