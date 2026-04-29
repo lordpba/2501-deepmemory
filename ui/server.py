@@ -148,13 +148,14 @@ async def chat_endpoint(data: dict):
 
     agent_instructions = (
         "\n\n--- WEB TOOLS ---\n"
-        "You have access to the Internet via tools, but use them ONLY if strictly necessary. "
-        "First, always try to answer using your internal knowledge and the context provided above. "
-        "Do NOT search the web for the user's personal data or projects (e.g. 'my projects'), as that is stored in your private memory.\n"
-        "If you truly need external or updated information from the web to answer the user, reply with exactly one of these commands on its own line:\n"
+        "You have access to the Internet. Use these tools whenever you need current information, "
+        "technical details, or any facts not present in your internal memory.\n"
+        "CRITICAL: Do NOT search the web for the user's private projects or personal identity (e.g. 'my projects'), "
+        "as that information exists ONLY in your internal memory context above.\n"
+        "To use a tool, you MUST reply with exactly one of these commands on its own line:\n"
         "ACTION: SEARCH [your search query here]\n"
         "ACTION: READ [url here]\n"
-        "Wait for the OBSERVATION before answering the user. Do not include your final answer in the same message as the ACTION."
+        "Wait for the OBSERVATION before providing your final answer. Do not include the final answer in the same message as the ACTION."
     )
     context += agent_instructions
 
