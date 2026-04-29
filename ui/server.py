@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
+import re
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import JSONResponse
@@ -20,6 +21,7 @@ from core.session import Session
 from core.memory import MemoryExtractor
 from core import context as ctx
 from core import llm
+from core.agent import search_web, read_webpage
 
 # ------------------------------------------------------------------
 # Global app state (simple for v1 — single user, single session)
@@ -144,17 +146,57 @@ async def chat_endpoint(data: dict):
     # Assemble Ghost context
     context = ctx.assemble(ghost, user_message)
 
-    # Call LLM
-    try:
-        reply = await llm.chat(
-            model,
-            session.to_llm_format(),
-            context=context,
-            images=images if images else None,
-            config=_state["llm_config"]
-        )
-    except Exception as e:
-        reply = f"⚠ LLM error: {e}"
+    agent_instructions = (
+        "\n\n--- WEB TOOLS ---\n"
+        "You have access to the Internet. If you need to search for current information or read a website to answer the user, "
+        "you MUST reply with exactly one of these commands on its own line:\n"
+        "ACTION: SEARCH [your search query here]\n"
+        "ACTION: READ [url here]\n"
+        "Wait for the OBSERVATION before answering the user. Do not include your final answer in the same message as the ACTION."
+    )
+    context += agent_instructions
+
+    # Agent Loop
+    max_steps = 3
+    for step in range(max_steps):
+        try:
+            reply = await llm.chat(
+                model,
+                session.to_llm_format(),
+                context=context,
+                images=images if (images and step == 0) else None,
+                config=_state["llm_config"]
+            )
+        except Exception as e:
+            reply = f"⚠ LLM error: {e}"
+            break
+
+        # Check for ACTION
+        action_match = re.search(r"ACTION:\s*(SEARCH|READ)\s+\[(.*?)\]", reply, re.IGNORECASE)
+        if not action_match:
+            action_match = re.search(r"ACTION:\s*(SEARCH|READ)\s+(.*)", reply, re.IGNORECASE)
+
+        if action_match:
+            action_type = action_match.group(1).upper()
+            action_arg = action_match.group(2).strip("[] ")
+            
+            session.add("assistant", reply)
+            
+            if action_type == "SEARCH":
+                await broadcast({"type": "activity", "message": f"🔍 Searching web for '{action_arg}'..."})
+                config = ghost.read_config() or {}
+                serper_key = config.get("serper_api_key")
+                observation = await search_web(action_arg, serper_key)
+                session.add("user", f"OBSERVATION from search '{action_arg}':\n{observation}")
+                
+            elif action_type == "READ":
+                await broadcast({"type": "activity", "message": f"📄 Reading webpage '{action_arg[:30]}...'..."})
+                observation = await read_webpage(action_arg)
+                session.add("user", f"OBSERVATION from reading {action_arg}:\n{observation}")
+                
+            continue # Next step in ReAct loop
+        else:
+            break # No action found, this is the final answer
 
     session.add("assistant", reply)
 
@@ -223,6 +265,16 @@ async def update_page(name: str, data: dict):
     return {"status": "ok"}
 
 
+@app.delete("/api/ghost/page/{name:path}")
+async def delete_page(name: str):
+    ghost: Ghost = _state["ghost"]
+    try:
+        ghost.delete_wiki_page(name)
+        return {"status": "ok"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @app.get("/api/ghost/graph")
 async def get_graph():
     ghost: Ghost = _state["ghost"]
@@ -235,12 +287,17 @@ async def get_graph():
     link_pattern = re.compile(r"\[\[([^\]]+)\]\]")
     
     for page in pages:
+        if page in ["index", "log"]:
+            continue
+            
         nodes.append({"id": page, "label": page})
         try:
             content = ghost.read_wiki_page(page)
             found_links = link_pattern.findall(content)
             for target in found_links:
                 target_clean = target.strip().lower().replace(" ", "-")
+                if target_clean in ["index", "log"]:
+                    continue
                 # We only add links to existing pages for now
                 if target_clean in pages:
                     links.append({"source": page, "target": target_clean})
@@ -248,6 +305,61 @@ async def get_graph():
             continue
             
     return {"nodes": nodes, "links": links}
+
+
+@app.post("/api/ghost/organize")
+async def organize_ghost():
+    ghost: Ghost = _state["ghost"]
+    try:
+        pages = ghost.list_wiki_pages()
+        migrations = {}
+        for p in pages:
+            if "/" in p:
+                continue
+            new_name = None
+            if p.startswith("concept-"):
+                new_name = "concepts/" + p[len("concept-"):]
+            elif p.startswith("project-"):
+                new_name = "projects/" + p[len("project-"):]
+            elif p.startswith("preferences-"):
+                new_name = "preferences/" + p[len("preferences-"):]
+            elif p.startswith("user-"):
+                new_name = "user/" + p[len("user-"):]
+            if new_name:
+                migrations[p] = new_name
+                
+        if not migrations:
+            return {"status": "ok", "message": "All pages are already organized."}
+            
+        all_pages = ghost.list_wiki_pages()
+        for p in all_pages:
+            try:
+                content = ghost.read_wiki_page(p)
+                new_content = content
+                for old_name, new_name in migrations.items():
+                    old_link = f"[[{old_name}]]"
+                    new_link = f"[[{new_name}]]"
+                    if old_link in new_content:
+                        new_content = new_content.replace(old_link, new_link)
+                if new_content != content:
+                    ghost.write_wiki_page(p, new_content)
+            except Exception:
+                pass
+                
+        wiki_dir = ghost.path / "wiki"
+        for old_name, new_name in migrations.items():
+            try:
+                content = ghost.read_wiki_page(old_name)
+                ghost.write_wiki_page(new_name, content)
+                old_file_path = wiki_dir / f"{old_name}.md.enc"
+                if old_file_path.exists():
+                    old_file_path.unlink()
+            except Exception:
+                pass
+                
+        return {"status": "ok", "message": f"Organized {len(migrations)} pages into categories."}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.post("/api/upload")

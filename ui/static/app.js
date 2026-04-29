@@ -141,6 +141,9 @@ async function loadConfig() {
       $('configProvider').value = data.provider;
       $('configOllamaBase').value = data.ollama_base || '';
       $('configApiKey').value = data.api_key || '';
+      if ($('configSerperKey')) {
+        $('configSerperKey').value = data.serper_api_key || '';
+      }
       toggleConfigFields(data.provider);
     }
   } catch {}
@@ -171,7 +174,8 @@ async function saveConfig() {
   const config = {
     provider: provider,
     ollama_base: $('configOllamaBase').value,
-    api_key: $('configApiKey').value
+    api_key: $('configApiKey').value,
+    serper_api_key: $('configSerperKey') ? $('configSerperKey').value : ''
   };
 
   setActivity('Updating configuration...', true);
@@ -770,6 +774,29 @@ function renderGraph(data) {
   }
 }
 
+// ── Maintenance ────────────────────────────
+async function organizeWiki() {
+  const btn = $('organizeWikiBtn');
+  const originalText = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = 'Organizing...';
+  try {
+    const r = await fetch('/api/ghost/organize', {method: 'POST'});
+    const data = await r.json();
+    if (data.error) {
+      alert('Error: ' + data.error);
+    } else {
+      alert(data.message);
+      await loadPages();
+    }
+  } catch (err) {
+    alert('Failed to organize: ' + err);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = originalText;
+  }
+}
+
 function toggleEdit() {
   state.editMode = !state.editMode;
   if (state.editMode) {
@@ -806,5 +833,28 @@ async function savePage() {
     setActivity(`Saved ${state.currentPage}.md`);
   } catch (e) {
     setActivity(`⚠ Save failed: ${e.message}`);
+  }
+}
+
+async function deletePage() {
+  if (!state.currentPage) return;
+  if (!confirm(`Are you sure you want to delete ${state.currentPage}? This action cannot be undone.`)) return;
+  
+  try {
+    const r = await fetch(`/api/ghost/page/${encodeURIComponent(state.currentPage)}`, {
+      method: 'DELETE'
+    });
+    
+    if (r.ok) {
+      setActivity(`Deleted ${state.currentPage}.md`);
+      state.currentPage = null;
+      switchTab('list');
+      await loadPages();
+    } else {
+      const data = await r.json();
+      setActivity(`⚠ Delete failed: ${data.error}`);
+    }
+  } catch (e) {
+    setActivity(`⚠ Delete failed: ${e.message}`);
   }
 }

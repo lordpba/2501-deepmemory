@@ -107,7 +107,10 @@
         <div class="page-toolbar">
           <button onclick="switchTab('list')" class="back-btn">← Back</button>
           <span id="currentPageName" class="current-page-name"></span>
-          <button onclick="toggleEdit()" id="editBtn" class="edit-btn">Edit</button>
+          <div style="display: flex; gap: 8px;">
+            <button onclick="deletePage()" id="deleteBtn" class="edit-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.2);">Delete</button>
+            <button onclick="toggleEdit()" id="editBtn" class="edit-btn">Edit</button>
+          </div>
         </div>
         <div id="pageContent" class="page-content markdown-body"></div>
         <textarea id="pageEditor" class="page-editor" style="display:none"></textarea>
@@ -161,6 +164,19 @@
         </div>
       </div>
 
+      <div class="form-group" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <label>Agent Tools</label>
+        <div class="form-group" style="margin-top: 8px;">
+          <label>Serper.dev API Key (Optional)</label>
+          <input type="password" id="configSerperKey" placeholder="For web search...">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <label>Maintenance</label>
+        <button id="organizeWikiBtn" onclick="organizeWiki()" class="edit-btn" style="width: 100%; display: flex; justify-content: center; margin-top: 8px;">Organize Wiki Folders</button>
+      </div>
+
       <div class="modal-actions">
         <button onclick="saveConfig()" class="primary-btn">Save & Refresh</button>
         <button onclick="closeModal('configModal')">Cancel</button>
@@ -168,6 +184,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

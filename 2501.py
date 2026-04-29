@@ -50,6 +50,7 @@ def parse_args():
     p.add_argument("--ghost", type=str, default=None, help="Path to Ghost directory")
     p.add_argument("--deploy", action="store_true", help="Force deployment to USB")
     p.add_argument("--sync-from-usb", action="store_true", help="Pull Ghost data from USB to Desktop")
+    p.add_argument("--migrate", action="store_true", help="Migrate old flat wiki pages to categorical folders")
     return p.parse_args()
 
 
@@ -253,6 +254,78 @@ def setup_ghost(ghost_dir: Path) -> Ghost:
             sys.exit(1)
 
 
+def migrate_wiki_logic(ghost: Ghost):
+    """Organize old flat wiki pages into categorical folders."""
+    print("\n  Scanning for old flat pages...")
+    pages = ghost.list_wiki_pages()
+    
+    migrations = {}
+    for p in pages:
+        if "/" in p:
+            continue
+            
+        new_name = None
+        if p.startswith("concept-"):
+            new_name = "concepts/" + p[len("concept-"):]
+        elif p.startswith("project-"):
+            new_name = "projects/" + p[len("project-"):]
+        elif p.startswith("preferences-"):
+            new_name = "preferences/" + p[len("preferences-"):]
+        elif p.startswith("user-"):
+            new_name = "user/" + p[len("user-"):]
+            
+        if new_name:
+            migrations[p] = new_name
+
+    if not migrations:
+        print("  No pages to migrate.\n")
+        return
+
+    print(f"  Found {len(migrations)} pages to migrate:")
+    for old, new in migrations.items():
+        print(f"    {old}  ->  {new}")
+        
+    ans = input("\n  Proceed with migration? (y/N): ").strip().lower()
+    if ans != "y":
+        print("  Aborted.\n")
+        return
+
+    print("\n  Updating internal links...")
+    all_pages = ghost.list_wiki_pages()
+    for p in all_pages:
+        try:
+            content = ghost.read_wiki_page(p)
+            new_content = content
+            for old_name, new_name in migrations.items():
+                old_link = f"[[{old_name}]]"
+                new_link = f"[[{new_name}]]"
+                if old_link in new_content:
+                    new_content = new_content.replace(old_link, new_link)
+            
+            if new_content != content:
+                ghost.write_wiki_page(p, new_content)
+                print(f"    Updated links in {p}")
+        except Exception as e:
+            print(f"    ⚠ Error reading {p}: {e}")
+
+    print("\n  Moving files...")
+    wiki_dir = ghost.path / "wiki"
+    for old_name, new_name in migrations.items():
+        try:
+            content = ghost.read_wiki_page(old_name)
+            ghost.write_wiki_page(new_name, content)
+            
+            old_file_path = wiki_dir / f"{old_name}.md.enc"
+            if old_file_path.exists():
+                old_file_path.unlink()
+                
+            print(f"    Moved {old_name} -> {new_name}")
+        except Exception as e:
+            print(f"    ⚠ Failed to move {old_name}: {e}")
+
+    print("\n  ✅ Migration complete!\n")
+
+
 def select_model(models: list[str]) -> str:
     """Let the user pick an Ollama model interactively."""
     if not models:
@@ -333,6 +406,11 @@ def main():
 
     # Setup Ghost
     ghost = setup_ghost(ghost_dir)
+
+    # Check for migration
+    if args.migrate:
+        migrate_wiki_logic(ghost)
+        sys.exit(0)
 
     # Export API keys from Ghost config
     config = ghost.read_config() or {}

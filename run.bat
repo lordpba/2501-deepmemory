@@ -11,8 +11,8 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Check if requirements are installed in local libs
-python -c "import sys; sys.path.insert(0, './libs'); import httpx" >nul 2>&1
+:: Check if requirements are installed (heuristic: check if bs4 is available)
+python -c "import sys; sys.path.insert(0, './libs'); import bs4" >nul 2>&1
 if %errorlevel% neq 0 (
     echo Installing requirements into local 'libs' folder...
     if not exist "libs" mkdir libs

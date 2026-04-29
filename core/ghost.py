@@ -124,6 +124,11 @@ class Ghost:
     def wiki_page_exists(self, name: str) -> bool:
         return (self.path / "wiki" / f"{name}.md.enc").exists()
 
+    def delete_wiki_page(self, name: str):
+        path = self.path / "wiki" / f"{name}.md.enc"
+        if path.exists():
+            path.unlink()
+
     # ------------------------------------------------------------------
     # Session operations
     # ------------------------------------------------------------------
