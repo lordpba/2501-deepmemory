@@ -40,25 +40,42 @@ def _local_python() -> Path:
 
 
 def _ensure_local_venv() -> None:
-    if not venv_dir.exists():
+    libs_dir = script_dir / "libs"
+    if not venv_dir.exists() and not libs_dir.exists():
         print("Creating local virtual environment...")
-        subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+        try:
+            subprocess.run([sys.executable, "-m", "venv", "--copies", str(venv_dir)], check=True)
+        except subprocess.CalledProcessError:
+            print("Venv creation failed (USB limits). Using 'libs' folder fallback...")
+            if venv_dir.exists(): shutil.rmtree(venv_dir)
+            libs_dir.mkdir(exist_ok=True)
 
     python_exe = _local_python()
     if not python_exe.exists():
-        raise SystemExit("Failed to locate the local venv Python executable.")
+        if libs_dir.exists():
+            # Fallback mode: use system python but ensure requirements in libs
+            python_exe = Path(sys.executable)
+        else:
+            raise SystemExit("Failed to locate a valid Python environment.")
 
-    check_import = subprocess.run(
-        [str(python_exe), "-c", "import httpx"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    # Check requirements
+    env = os.environ.copy()
+    if libs_dir.exists():
+        env["PYTHONPATH"] = str(libs_dir) + os.pathsep + env.get("PYTHONPATH", "")
+
+    check_cmd = [str(python_exe), "-c", "import httpx"]
+    check_import = subprocess.run(check_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+    
     if check_import.returncode != 0:
-        print("Installing requirements into local virtual environment...")
-        subprocess.run([str(python_exe), "-m", "pip", "install", "--upgrade", "pip"], check=True)
-        subprocess.run([str(python_exe), "-m", "pip", "install", "-r", str(script_dir / "requirements.txt")], check=True)
+        print("Installing requirements...")
+        if venv_dir.exists() and _local_python().exists():
+            subprocess.run([str(_local_python()), "-m", "pip", "install", "--upgrade", "pip"], check=True)
+            subprocess.run([str(_local_python()), "-m", "pip", "install", "-r", str(script_dir / "requirements.txt")], check=True)
+        else:
+            # Install to libs folder
+            subprocess.run([sys.executable, "-m", "pip", "install", "-t", str(libs_dir), "-r", str(script_dir / "requirements.txt")], check=True)
 
-    if not _in_local_venv():
+    if not _in_local_venv() and venv_dir.exists() and _local_python().exists():
         print("Restarting with the local virtual environment...")
         os.execv(str(python_exe), [str(python_exe), str(__file__), *sys.argv[1:]])
 
