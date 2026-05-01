@@ -6,6 +6,8 @@
 > *"Your Ghost travels with you. The Shell is just borrowed."*
 > — inspired by Project 2501, Ghost in the Shell (Masamune Shirow)
 
+![2501 Logo](2501.png)
+
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
 ChatGPT doesn't remember you when you move to Claude. Claude doesn't remember you when you move to Llama. Every conversation starts from zero. Your memory belongs to their servers, not to you.
@@ -27,8 +29,9 @@ The Ghost is yours. The machine is just a **Shell** you borrow.
 ## Features (v1.1.0)
 
 - **Portable USB Mode** — Auto-deploy the entire system to a USB stick. Works on any machine without installation.
-- **Cross-Platform** — Native launchers for Linux (`run.sh`) and Windows (`run.bat`).
-- **Portable Dependencies** — No more `venv` symlink errors on USB sticks (FAT32/exFAT). Dependencies live in a local `libs` folder.
+- **Cross-Platform** — Native launchers for Linux (`run.sh`) and Windows (`run.bat`), plus direct bootstrapping from `python3 2501.py`.
+- **Local venv bootstrap** — `2501.py` creates a repository-local `venv/` on first run and installs `requirements.txt` automatically.
+- **Portable Dependencies** — USB mode still supports a local `libs` folder for portable installs on FAT32/exFAT sticks.
 - **Multi-Provider LLM** — Use local **Ollama** (including remote LAN endpoints), **OpenAI**, **Google Gemini**, or **Anthropic Claude**.
 - **Secure Key Vault** — Your API keys are stored **encrypted** inside your Ghost. Only you can unlock them.
 - **Hierarchical LLM Wiki** — Obsidian-style tree view. Automatically groups memories into categories (`project`, `knowledge`, `user`).
@@ -45,10 +48,13 @@ The Ghost is yours. The machine is just a **Shell** you borrow.
 git clone https://github.com/lordpba/2501-deepmemory
 cd 2501-deepmemory
 
-# Launch (Linux)
+# Launch directly (Linux / macOS)
+python3 2501.py
+
+# Or launch via the Linux wrapper
 bash run.sh
 
-# Launch (Windows)
+# Launch on Windows
 run.bat
 ```
 

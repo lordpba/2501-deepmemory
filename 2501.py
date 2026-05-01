@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import os
 import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -19,10 +20,54 @@ import webbrowser
 from getpass import getpass
 from pathlib import Path
 
+script_dir = Path(__file__).parent.absolute()
+venv_dir = script_dir / "venv"
+
+# --- Local virtual environment bootstrap ---
+# Ensure the script runs inside the repository-local venv and install requirements if needed.
+
+def _in_local_venv() -> bool:
+    return (
+        os.environ.get("VIRTUAL_ENV") == str(venv_dir)
+        or Path(sys.prefix).resolve() == venv_dir.resolve()
+    )
+
+
+def _local_python() -> Path:
+    if os.name == "nt":
+        return venv_dir / "Scripts" / "python.exe"
+    return venv_dir / "bin" / "python"
+
+
+def _ensure_local_venv() -> None:
+    if not venv_dir.exists():
+        print("Creating local virtual environment...")
+        subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+
+    python_exe = _local_python()
+    if not python_exe.exists():
+        raise SystemExit("Failed to locate the local venv Python executable.")
+
+    check_import = subprocess.run(
+        [str(python_exe), "-c", "import httpx"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if check_import.returncode != 0:
+        print("Installing requirements into local virtual environment...")
+        subprocess.run([str(python_exe), "-m", "pip", "install", "--upgrade", "pip"], check=True)
+        subprocess.run([str(python_exe), "-m", "pip", "install", "-r", str(script_dir / "requirements.txt")], check=True)
+
+    if not _in_local_venv():
+        print("Restarting with the local virtual environment...")
+        os.execv(str(python_exe), [str(python_exe), str(__file__), *sys.argv[1:]])
+
+
+_ensure_local_venv()
+
 # --- Portable Dependency Support ---
 # If a 'libs' folder exists in the script directory, add it to sys.path.
 # This allows carrying dependencies on USB sticks (FAT32/exFAT) where venv symlinks fail.
-script_dir = Path(__file__).parent.absolute()
 libs_dir = script_dir / "libs"
 if libs_dir.exists():
     sys.path.insert(0, str(libs_dir))
