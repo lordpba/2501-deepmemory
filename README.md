@@ -1,13 +1,10 @@
 # 2501 DeepMemory
 > *Portable, Persistent AI Memory.*
-
-![2501 Ghost](name_your_ghost.png)
-
+![2501 Logo](2501.png)
 > *"Your Ghost travels with you. The Shell is just borrowed."*
 > — inspired by Project 2501, Ghost in the Shell (Masamune Shirow)
 
-![2501 Logo](2501.png)
-
+![2501 Ghost](name_your_ghost.png)
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
 ChatGPT doesn't remember you when you move to Claude. Claude doesn't remember you when you move to Llama. Every conversation starts from zero. Your memory belongs to their servers, not to you.
