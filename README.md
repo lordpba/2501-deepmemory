@@ -1,6 +1,6 @@
 # 2501 DeepMemory
 > *Portable, Persistent AI Memory.*
-![2501 Logo](2501.png)
+![2501 Logo](2501_small.png)
 
 > *"Your Ghost travels with you. The Shell is just borrowed."*
 > — inspired by Project 2501, Ghost in the Shell (Masamune Shirow)
