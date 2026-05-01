@@ -237,25 +237,40 @@ async def extract_memories(
 
     existing_note = ""
     if existing_pages:
-        existing_note = f"\nExisting Ghost pages: {', '.join(existing_pages)}\n"
+        existing_note = f"Existing Ghost pages: {', '.join(existing_pages)}"
 
-    prompt = (
+    # We use instructions as a system prompt to enforce rules better
+    system_prompt = (
         f"{instructions}\n\n"
         f"Today's date: {today}\n"
-        f"{existing_note}\n"
-        f"## Conversation to process:\n\n{conv_text}\n\n"
-        f"## Extract memories now:"
+        f"{existing_note}"
     )
 
-    response = await chat(model, [{"role": "user", "content": prompt}], config=config)
+    user_prompt = (
+        "## Conversation to process:\n\n"
+        f"{conv_text}\n\n"
+        "---"
+        "Identify any new personal facts, project updates, preferences, or technical knowledge in the conversation above. "
+        "Update existing pages or create new ones using the <<<PAGE:category/name>>> format defined in your instructions. "
+        "If there is nothing worth remembering, reply ONLY with: NOTHING_TO_REMEMBER"
+    )
 
-    if "NOTHING_TO_REMEMBER" in response:
+    # Use chat with system context
+    response = await chat(
+        model, 
+        [{"role": "user", "content": user_prompt}], 
+        context=system_prompt, 
+        config=config
+    )
+
+    if "NOTHING_TO_REMEMBER" in response.upper() and len(response) < 50:
         return []
 
     pages = []
+    # Support both <<<PAGE: and <<<PAGE:
     parts = response.split("<<<PAGE:")
     for part in parts[1:]:
-        if "<<<ENDPAGE>>>" in part:
+        if ">>>" in part and "<<<ENDPAGE>>>" in part:
             header, rest = part.split(">>>", 1)
             page_name = header.strip().lower().replace(" ", "-")
             content = rest.split("<<<ENDPAGE>>>")[0].strip()
