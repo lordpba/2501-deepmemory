@@ -20,7 +20,7 @@ from core.ghost import Ghost
 from core.session import Session
 from core.memory import MemoryExtractor
 from core import context as ctx
-from core import llm
+from core import llm, utils
 from core.agent import search_web, read_webpage
 
 # ------------------------------------------------------------------
@@ -484,6 +484,16 @@ def start(ghost: Ghost, model: str, instructions: str, port: int = 2501):
     else:
         # Default config
         _state["llm_config"] = {"provider": "ollama", "ollama_base": "http://localhost:11434"}
+
+    # Lightweight pre-flight check for Ollama (async, so we use asyncio.run)
+    if _state["llm_config"].get("provider") == "ollama":
+        try:
+            is_available, check_msg, model_count = asyncio.run(llm.check_ollama_available(_state["llm_config"]))
+            if not is_available:
+                print(f"\n  ⚠ WARNING: Ollama unavailable - {check_msg}")
+                print(f"  Models will show error when accessed. You can change provider in UI settings.\n")
+        except Exception as e:
+            print(f"  ⚠ Could not check Ollama status: {e}")
 
     _state["session"] = Session(ghost)
     _state["extractor"] = MemoryExtractor(ghost, model, instructions)

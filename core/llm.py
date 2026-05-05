@@ -41,6 +41,51 @@ async def _check_ollama_multimodal(client, base_url, model_name):
     except Exception:
         return model_name, False
 
+async def check_ollama_available(config: dict = None) -> tuple[bool, str, int]:
+    """
+    Quick pre-flight check that Ollama is responding with available models.
+    
+    Args:
+        config: LLM config dict with "provider" and "ollama_base" keys
+        
+    Returns:
+        tuple[bool, str, int]: (is_available, message, model_count)
+        - is_available: True if Ollama is responding and has models
+        - message: Human-readable status/error message
+        - model_count: Number of models found (0 if unavailable)
+    """
+    config = config or {}
+    provider = config.get("provider", "ollama")
+    
+    # Only check Ollama
+    if provider != "ollama":
+        return True, f"Using {provider} provider", 0
+    
+    base_url = config.get("ollama_base", "http://localhost:11434")
+    
+    try:
+        # Short timeout for quick feedback
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{base_url}/api/tags")
+            r.raise_for_status()
+            models = r.json().get("models", [])
+            model_count = len(models)
+            
+            if model_count == 0:
+                return False, f"No models available at {base_url}. Pull a model with: ollama pull <model>", 0
+            
+            return True, f"Found {model_count} Ollama model(s)", model_count
+            
+    except httpx.ConnectError:
+        return False, f"Cannot connect to Ollama at {base_url}. Is it running?", 0
+    except httpx.TimeoutException:
+        return False, f"Ollama at {base_url} did not respond (timeout). Is it running?", 0
+    except httpx.HTTPStatusError as e:
+        return False, f"Ollama at {base_url} returned error {e.response.status_code}", 0
+    except Exception as e:
+        return False, f"Error checking Ollama: {str(e)}", 0
+
+
 async def detect_models(config: dict = None) -> list[str]:
     """Return list of available models for the configured provider."""
     config = config or {}

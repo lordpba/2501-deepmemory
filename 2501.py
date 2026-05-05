@@ -109,7 +109,7 @@ if libs_dir.exists():
 # ----------------------------------
 
 from core.ghost import Ghost, WrongPasswordError
-from core import llm
+from core import llm, utils
 
 VERSION = "1.1.0"
 
@@ -204,13 +204,13 @@ def deploy_to_usb(source_dir: Path):
             
             if action == 'u' or action == '':
                 is_update = True
-                # Remove old core/ui to prevent stale files
-                for d in ["core", "ui"]:
+                # Remove old core/ui/libs folders to prevent stale or conflicting files
+                for d in ["core", "ui", "libs_nt", "libs_posix"]:
                     old_dir = target_dir / d
                     if old_dir.exists():
                         try:
                             shutil.rmtree(old_dir)
-                        except OSError as e:
+                        except OSError:
                             pass
             elif action == 'o':
                 target_ghost = target_dir / "ghost"
@@ -247,11 +247,14 @@ def deploy_to_usb(source_dir: Path):
             target_dir.mkdir(parents=True, exist_ok=True)
             for item in to_copy:
                 src = source_dir / item
+                dest = target_dir / item
                 if src.exists():
                     if src.is_dir():
-                        shutil.copytree(src, target_dir / item)
+                        if dest.exists():
+                            shutil.rmtree(dest)
+                        shutil.copytree(src, dest)
                     else:
-                        shutil.copy(src, target_dir / item)
+                        shutil.copy(src, dest)
             
             # Try to make run.sh executable
             try:
@@ -532,6 +535,41 @@ def main():
     # Detect models based on configured provider
     provider = llm_config.get("provider", "ollama")
     print(f"  Detecting models for provider: {provider}...")
+    
+    # Pre-flight check for Ollama availability
+    if provider == "ollama":
+        is_available, check_msg, model_count = asyncio.run(llm.check_ollama_available(llm_config))
+        
+        if not is_available:
+            print(f"\n  ⚠ {check_msg}")
+            print(f"\n  Attempting to start Ollama service...")
+            success, start_msg = utils.start_ollama_service()
+            
+            if success:
+                print(f"  {start_msg}")
+                # Retry detection after starting service
+                time.sleep(2)  # Give service time to start
+                is_available, check_msg, model_count = asyncio.run(llm.check_ollama_available(llm_config))
+            else:
+                print(f"  {start_msg}")
+            
+            # If still unavailable, ask user to configure alternative provider
+            if not is_available:
+                print(f"\n  Would you like to configure an alternative LLM provider?")
+                ans = input(f"  (1=OpenAI, 2=Gemini, 3=Claude, 0=Try anyway): ").strip() or "0"
+                
+                if ans in ["1", "2", "3"]:
+                    provider_map = {"1": "openai", "2": "gemini", "3": "claude"}
+                    key_names = {"1": "OpenAI", "2": "Gemini", "3": "Claude"}
+                    models_map = {"1": "gpt-4o-mini", "2": "gemini-1.5-flash", "3": "claude-3-haiku-20240307"}
+                    
+                    chosen_provider = provider_map[ans]
+                    api_key = getpass(f"  {key_names[ans]} API Key: ").strip()
+                    llm_config = {"provider": chosen_provider, "api_key": api_key}
+                    provider = chosen_provider
+                    ghost.write_config({"llm_config": llm_config})
+                    print(f"  ✓ Provider switched to {chosen_provider}.")
+    
     try:
         models = asyncio.run(llm.detect_models(llm_config))
     except Exception as e:
@@ -544,7 +582,7 @@ def main():
     else:
         print(f"\n  ⚠ No models found for {provider}.")
         if provider == "ollama":
-            ans = input("  Would you like to configure an API key (OpenAI/Gemini/Claude) instead? (y/N): ").strip().lower()
+            ans = input("  Would you like to configure an alternative provider? (y/N): ").strip().lower()
             if ans == "y":
                 # Fallback CLI setup for APIs if Ollama is down and UI isn't reached yet
                 print("\n  --- External LLM Configuration ---")

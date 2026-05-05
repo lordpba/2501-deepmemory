@@ -83,6 +83,108 @@ You can configure your LLM by clicking the **Settings (gear icon)** in the top r
 - **Cloud APIs**: Select OpenAI, Gemini, or Claude and enter your API Key.
 - **Ghost Security**: All settings and memories are Fernet-encrypted (AES-128-CBC + HMAC) using your Ghost password.
 
+### Setting up Ollama
+
+2501 includes **automatic Ollama detection and service startup**. When you launch 2501, it checks if Ollama is running and attempts to start it if necessary.
+
+#### Windows
+
+1. **Download and Install**
+   - Download Ollama from [ollama.ai/download](https://ollama.ai/download/windows)
+   - Run the installer and follow the setup wizard
+   - Ollama will be installed as a Windows service
+
+2. **Verify Installation**
+   ```powershell
+   net start ollama
+   ```
+   Or double-click `Ollama.exe` to start the desktop application.
+
+3. **Pull a Model**
+   ```powershell
+   ollama pull llama2
+   # Or pull other models: ollama pull mistral, ollama pull neural-chat, etc.
+   ```
+
+4. **Troubleshooting**
+   - If you see "⚠ Ollama not responding" on startup:
+     - Open PowerShell **as Administrator**
+     - Run: `net start ollama`
+   - If the service fails to start:
+     - Ensure you have ~10GB free disk space
+     - Restart your computer
+     - Try: `ollama serve` in PowerShell directly
+
+#### Linux
+
+1. **Download and Install**
+   ```bash
+   curl -fsSL https://ollama.ai/install.sh | sh
+   ```
+   Or use your package manager:
+   ```bash
+   # Ubuntu/Debian
+   apt-get install ollama
+   
+   # Fedora/RHEL
+   yum install ollama
+   ```
+
+2. **Start the Service**
+   ```bash
+   sudo systemctl start ollama
+   sudo systemctl enable ollama  # Auto-start on boot
+   ```
+
+3. **Pull a Model**
+   ```bash
+   ollama pull llama2
+   # Or other models: ollama pull mistral, ollama pull neural-chat, etc.
+   ```
+
+4. **Alternative: Docker**
+   ```bash
+   docker run -d -p 11434:11434 ollama/ollama
+   docker exec <container_id> ollama pull llama2
+   ```
+
+5. **Troubleshooting**
+   - Check service status: `sudo systemctl status ollama`
+   - View logs: `journalctl -u ollama -f`
+   - If not using systemd, run directly: `ollama serve`
+
+#### macOS
+
+1. **Download and Install**
+   - Download from [ollama.ai/download](https://ollama.ai/download/mac)
+   - Drag `Ollama.app` to Applications folder
+   - Double-click to launch (runs in background)
+
+2. **Pull a Model**
+   ```bash
+   ollama pull llama2
+   ```
+
+3. **Troubleshooting**
+   - Ollama should auto-start on login; check Activity Monitor if not
+   - Or manually open: Applications → Ollama.app
+
+#### Remote Ollama (LAN / Server)
+
+If you're running Ollama on a different machine on your network:
+
+1. **Configure in 2501 UI**
+   - Click ⚙️ (Settings) in the top-right
+   - Change Ollama endpoint from `http://localhost:11434` to `http://<server-ip>:11434`
+   - Save
+
+2. **Allow Network Access**
+   On the Ollama server, set environment variable before starting:
+   ```bash
+   export OLLAMA_HOST=0.0.0.0:11434
+   ollama serve
+   ```
+
 ---
 
 ## The Ghost Structure
