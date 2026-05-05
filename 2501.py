@@ -553,10 +553,24 @@ def main():
             else:
                 print(f"  {start_msg}")
             
-            # If still unavailable, ask user to configure alternative provider
+            # If still unavailable, try localhost fallback if configured remote
             if not is_available:
-                print(f"\n  Would you like to configure an alternative LLM provider?")
-                ans = input(f"  (1=OpenAI, 2=Gemini, 3=Claude, 0=Try anyway): ").strip() or "0"
+                configured_base = llm_config.get("ollama_base", "http://localhost:11434")
+                if configured_base != "http://localhost:11434":
+                    print(f"  Trying localhost fallback...")
+                    llm_config["ollama_base"] = "http://localhost:11434"
+                    is_available, check_msg, model_count = asyncio.run(llm.check_ollama_available(llm_config))
+                    if is_available:
+                        print(f"  ✓ Found Ollama on localhost.")
+                        # Update config to localhost
+                        ghost.write_config({"llm_config": llm_config})
+                    else:
+                        print(f"  ⚠ {check_msg}")
+                
+                # If still unavailable, ask user to configure alternative provider
+                if not is_available:
+                    print(f"\n  Would you like to configure an alternative LLM provider?")
+                    ans = input(f"  (1=OpenAI, 2=Gemini, 3=Claude, 0=Try anyway): ").strip() or "0"
                 
                 if ans in ["1", "2", "3"]:
                     provider_map = {"1": "openai", "2": "gemini", "3": "claude"}
