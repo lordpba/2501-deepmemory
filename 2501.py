@@ -47,14 +47,20 @@ def _local_python() -> Path:
 
 def _ensure_local_venv() -> None:
     libs_dir = script_dir / f"libs_{os.name}"
-    if not venv_dir.exists() and not libs_dir.exists():
-        print("Creating local virtual environment...")
-        try:
-            subprocess.run([sys.executable, "-m", "venv", "--copies", str(venv_dir)], check=True)
-        except subprocess.CalledProcessError:
-            print("Venv creation failed (USB limits). Using 'libs' folder fallback...")
-            if venv_dir.exists(): shutil.rmtree(venv_dir)
-            libs_dir.mkdir(exist_ok=True)
+    if os.name == "nt":
+        # On Windows, always use libs folder for portability
+        if venv_dir.exists():
+            shutil.rmtree(venv_dir)
+        libs_dir.mkdir(exist_ok=True)
+    else:
+        if not venv_dir.exists() and not libs_dir.exists():
+            print("Creating local virtual environment...")
+            try:
+                subprocess.run([sys.executable, "-m", "venv", "--copies", str(venv_dir)], check=True)
+            except subprocess.CalledProcessError:
+                print("Venv creation failed (USB limits). Using 'libs' folder fallback...")
+                if venv_dir.exists(): shutil.rmtree(venv_dir)
+                libs_dir.mkdir(exist_ok=True)
 
     python_exe = _local_python()
     if not python_exe.exists():
@@ -74,7 +80,7 @@ def _ensure_local_venv() -> None:
     
     if check_import.returncode != 0:
         print("Installing requirements...")
-        if venv_dir.exists() and _local_python().exists():
+        if venv_dir.exists() and _local_python().exists() and os.name != "nt":
             subprocess.run([str(_local_python()), "-m", "pip", "install", "--upgrade", "pip"], check=True)
             subprocess.run([str(_local_python()), "-m", "pip", "install", "-r", str(script_dir / "requirements.txt")], check=True)
         else:
@@ -84,7 +90,7 @@ def _ensure_local_venv() -> None:
             libs_dir.mkdir(exist_ok=True)
             subprocess.run([sys.executable, "-m", "pip", "install", "-t", str(libs_dir), "-r", str(script_dir / "requirements.txt")], check=True)
 
-    if not _in_local_venv() and venv_dir.exists() and _local_python().exists():
+    if not _in_local_venv() and venv_dir.exists() and _local_python().exists() and os.name != "nt":
         print("Restarting with the local virtual environment...")
         if os.name == "nt":
             sys.exit(subprocess.call([str(python_exe), str(__file__)] + sys.argv[1:]))

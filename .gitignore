@@ -1,6 +1,7 @@
 # Virtual environment
 venv/
 .venv/
+libs_nt/
 
 # Your personal Ghost — NEVER commit this
 ghost/
