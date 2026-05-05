@@ -13,7 +13,7 @@ import httpx
 import re
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from core.ghost import Ghost
@@ -222,7 +222,9 @@ async def extract_memories():
     extractor: MemoryExtractor = _state["extractor"]
 
     unextracted = session.get_unextracted()
-    if not unextracted:
+    raw_files = _state["ghost"].list_raw_files()
+    
+    if not unextracted and not raw_files:
         return {"status": "nothing_to_extract"}
 
     _state["extracting"] = True
@@ -235,11 +237,22 @@ async def extract_memories():
         extractor.model = _state["model"]
         extractor.config = _state["llm_config"]
         
-        written = await extractor.extract(unextracted, on_progress=progress)
-        session.mark_extracted()
-        if written:
-            await broadcast({"type": "ghost_updated", "pages": written})
-        return {"status": "ok", "pages_written": written}
+        all_written = []
+        
+        if unextracted:
+            written_chat = await extractor.extract(unextracted, on_progress=progress)
+            if written_chat:
+                all_written.extend(written_chat)
+            session.mark_extracted()
+            
+        written_raw = await extractor.process_raw_files(on_progress=progress)
+        if written_raw:
+            all_written.extend(written_raw)
+            
+        if all_written:
+            await broadcast({"type": "ghost_updated", "pages": all_written})
+            
+        return {"status": "ok", "pages_written": all_written}
     finally:
         _state["extracting"] = False
 
@@ -247,8 +260,37 @@ async def extract_memories():
 @app.get("/api/ghost/pages")
 async def list_pages():
     ghost: Ghost = _state["ghost"]
-    pages = ghost.list_wiki_pages()
-    return {"pages": pages}
+    return {"pages": ghost.list_wiki_pages()}
+
+@app.get("/api/ghost/raw")
+async def list_raw():
+    ghost: Ghost = _state["ghost"]
+    return {"files": ghost.list_raw_files()}
+
+@app.post("/api/ghost/raw/upload")
+async def upload_raw(file: UploadFile = File(...)):
+    ghost: Ghost = _state["ghost"]
+    content = await file.read()
+    raw_path = ghost.path / "raw" / file.filename
+    raw_path.write_bytes(content)
+    return {"status": "ok", "filename": file.filename}
+
+@app.get("/api/ghost/raw/{name:path}")
+async def get_raw_file(name: str):
+    ghost: Ghost = _state["ghost"]
+    try:
+        content = ghost.read_raw_file(name)
+        # Determine content type based on extension
+        ext = Path(name).suffix.lower()
+        content_type = "application/octet-stream"
+        if ext in [".txt", ".md", ".csv"]: content_type = "text/plain"
+        elif ext == ".pdf": content_type = "application/pdf"
+        elif ext in [".png"]: content_type = "image/png"
+        elif ext in [".jpg", ".jpeg"]: content_type = "image/jpeg"
+        
+        return Response(content=content, media_type=content_type)
+    except Exception as e:
+        return JSONResponse(status_code=404, content={"error": str(e)})
 
 
 @app.get("/api/ghost/page/{name:path}")

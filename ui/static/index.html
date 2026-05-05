@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>2501 DeepMemory</title>
   <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
@@ -88,11 +88,24 @@
       <div class="ghost-header">
         <span class="ghost-title">Ghost</span>
         <div class="ghost-tabs">
+          <button class="tab" id="tabRaw" onclick="switchTab('raw')">Raw</button>
           <button class="tab active" id="tabList" onclick="switchTab('list')">Pages</button>
           <button class="tab" id="tabGraph" onclick="switchTab('graph')">Graph</button>
           <button class="tab" id="tabPage" onclick="switchTab('page')" style="display:none">View</button>
         </div>
         <input type="search" id="pageSearch" placeholder="Search..." oninput="filterPages()">
+      </div>
+
+      <!-- Raw files view -->
+      <div id="viewRaw" class="ghost-view" style="display:none; padding: 10px;">
+        <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12px; color: var(--text-dim);">Unprocessed sources</span>
+          <label class="btn" style="cursor:pointer; padding: 4px 8px; font-size: 11px;">
+            Upload
+            <input type="file" id="rawUploadInput" style="display:none;" multiple>
+          </label>
+        </div>
+        <div id="rawList" class="page-list"></div>
       </div>
 
       <!-- Pages list view -->
@@ -184,6 +197,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

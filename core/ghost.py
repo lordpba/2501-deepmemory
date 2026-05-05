@@ -52,6 +52,7 @@ class Ghost:
         (ghost.path / "identity").mkdir(exist_ok=True)
         (ghost.path / "wiki").mkdir(exist_ok=True)
         (ghost.path / "sessions").mkdir(exist_ok=True)
+        (ghost.path / "raw").mkdir(exist_ok=True)
 
         salt = os.urandom(16)
         (ghost.path / "identity" / "salt.bin").write_bytes(salt)
@@ -85,6 +86,8 @@ class Ghost:
             ghost._read("identity/meta.json")
         except (InvalidToken, Exception):
             raise WrongPasswordError("Wrong password")
+            
+        (ghost.path / "raw").mkdir(exist_ok=True)
         return ghost
 
     @staticmethod
@@ -108,12 +111,34 @@ class Ghost:
     def list_wiki_pages(self) -> list[str]:
         """Return page names (without .md extension), supporting subdirectories."""
         wiki_dir = self.path / "wiki"
+        if not wiki_dir.exists():
+            return []
         pages = []
-        for f in wiki_dir.rglob("*.md.enc"):
-            rel = f.relative_to(wiki_dir)
-            # convert relative path to string and strip .md.enc (7 chars)
-            pages.append(str(rel)[:-7].replace("\\", "/"))
+        for p in wiki_dir.rglob("*.md.enc"):
+            pages.append(p.relative_to(wiki_dir).with_suffix("").with_suffix("").as_posix())
         return sorted(pages)
+
+    # ------------------------------------------------------------------
+    # Raw operations
+    # ------------------------------------------------------------------
+
+    def list_raw_files(self) -> list[str]:
+        """Return a list of files in the raw directory."""
+        raw_dir = self.path / "raw"
+        if not raw_dir.exists():
+            return []
+        files = []
+        for p in raw_dir.rglob("*"):
+            if p.is_file():
+                files.append(p.relative_to(raw_dir).as_posix())
+        return sorted(files)
+        
+    def read_raw_file(self, name: str) -> bytes:
+        """Read a file from the raw directory (unencrypted)."""
+        p = self.path / "raw" / name
+        if not p.exists() or not p.is_file():
+            raise FileNotFoundError(f"Raw file {name} not found.")
+        return p.read_bytes()
 
     def read_wiki_page(self, name: str) -> str:
         return self._read(f"wiki/{name}.md").decode("utf-8")

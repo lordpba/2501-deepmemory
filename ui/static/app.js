@@ -544,6 +544,55 @@ async function loadPages() {
   } catch {}
 }
 
+async function loadRaw() {
+  try {
+    const r = await fetch('/api/ghost/raw');
+    const data = await r.json();
+    const list = $('rawList');
+    list.innerHTML = '';
+    
+    if (!data.files || data.files.length === 0) {
+      list.innerHTML = '<div class="page-list-empty">No raw files. Upload some sources.</div>';
+      return;
+    }
+    
+    data.files.forEach(file => {
+      const el = document.createElement('div');
+      el.className = 'tree-item page-item';
+      el.innerHTML = `<span class="page-icon">📦</span><span class="page-name">${file}</span>`;
+      el.onclick = () => window.open('/api/ghost/raw/' + encodeURIComponent(file), '_blank');
+      list.appendChild(el);
+    });
+  } catch {}
+}
+
+// Ensure rawUploadInput works
+document.addEventListener('DOMContentLoaded', () => {
+  const rawInput = $('rawUploadInput');
+  if (rawInput) {
+    rawInput.addEventListener('change', async () => {
+      if (!rawInput.files.length) return;
+      setActivity('Uploading raw files...', true);
+      
+      for (const file of rawInput.files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          await fetch('/api/ghost/raw/upload', {
+            method: 'POST',
+            body: formData
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      rawInput.value = '';
+      setActivity('Upload complete.');
+      await loadRaw();
+    });
+  }
+});
+
 function renderPageList(pages) {
   if (!pages.length) {
     pageList.innerHTML = '<div class="page-list-empty">No pages yet — start a conversation.</div>';
@@ -586,9 +635,20 @@ function renderTree(node, container, depth) {
     if (item._isPage) {
       el.classList.add('page-item');
       el.id = `page-item-${item.fullName}`;
-      const icon = (item.fullName === 'index' || item.fullName === 'log') ? '🔖' : '📄';
+      
+      let icon = '📄';
+      if (item.fullName === 'index' || item.fullName === 'log') icon = '🔖';
+      else if (item.fullName.startsWith('raw/')) icon = '📦';
+      
       el.innerHTML = `<span class="page-icon">${icon}</span><span class="page-name">${key}</span>`;
-      el.onclick = () => openPage(item.fullName);
+      el.onclick = () => {
+        if (item.fullName.startsWith('raw/')) {
+          const rawPath = item.fullName.substring(4); // Remove 'raw/'
+          window.open('/api/ghost/raw/' + encodeURIComponent(rawPath), '_blank');
+        } else {
+          openPage(item.fullName);
+        }
+      };
     } else {
       el.classList.add('folder-item');
       el.innerHTML = `<span class="folder-icon">📁</span><span class="folder-name">${key}</span>`;
@@ -618,6 +678,42 @@ function filterPages() {
     ? state.allPages.filter(p => p.includes(q))
     : state.allPages;
   renderPageList(filtered);
+}
+
+function switchTab(tab) {
+  $('viewList').style.display = 'none';
+  $('viewPage').style.display = 'none';
+  $('viewGraph').style.display = 'none';
+  $('viewRaw').style.display = 'none';
+  
+  $('tabList').classList.remove('active');
+  $('tabGraph').classList.remove('active');
+  $('tabPage').classList.remove('active');
+  $('tabRaw').classList.remove('active');
+  
+  if (tab === 'list') {
+    $('viewList').style.display = 'block';
+    $('tabList').classList.add('active');
+    tabPage.style.display = 'none';
+    pageSearch.style.display = 'block';
+  } else if (tab === 'raw') {
+    $('viewRaw').style.display = 'block';
+    $('tabRaw').classList.add('active');
+    tabPage.style.display = 'none';
+    pageSearch.style.display = 'none';
+    loadRaw();
+  } else if (tab === 'graph') {
+    $('viewGraph').style.display = 'block';
+    $('tabGraph').classList.add('active');
+    tabPage.style.display = 'none';
+    pageSearch.style.display = 'none';
+    if (!state.graphRendered) renderGraph();
+  } else if (tab === 'page') {
+    $('viewPage').style.display = 'flex';
+    $('tabPage').classList.add('active');
+    tabPage.style.display = 'inline-block';
+    pageSearch.style.display = 'none';
+  }
 }
 
 function flashPages(pages) {
@@ -653,38 +749,7 @@ async function openPage(name) {
   } catch {}
 }
 
-function switchTab(tab) {
-  if (tab === 'list') {
-    $('viewList').style.display = 'block';
-    $('viewPage').style.display = 'none';
-    $('viewGraph').style.display = 'none';
-    tabList.classList.add('active');
-    tabGraph.classList.remove('active');
-    tabPage.classList.remove('active');
-    tabPage.style.display = 'none';
-    pageSearch.style.display = 'block';
-  } else if (tab === 'graph') {
-    $('viewList').style.display = 'none';
-    $('viewPage').style.display = 'none';
-    $('viewGraph').style.display = 'block';
-    tabList.classList.remove('active');
-    tabGraph.classList.add('active');
-    tabPage.classList.remove('active');
-    tabPage.style.display = 'none';
-    pageSearch.style.display = 'none';
-    loadGraph();
-  } else {
-    $('viewList').style.display = 'none';
-    $('viewPage').style.display = 'flex';
-    $('viewPage').style.flexDirection = 'column';
-    $('viewGraph').style.display = 'none';
-    tabList.classList.remove('active');
-    tabGraph.classList.remove('active');
-    tabPage.classList.add('active');
-    tabPage.style.display = 'inline-block';
-    pageSearch.style.display = 'none';
-  }
-}
+
 
 // ── Graph rendering (D3.js) ────────────────
 let simulation = null;

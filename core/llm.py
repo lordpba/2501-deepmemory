@@ -11,15 +11,35 @@ from pathlib import Path
 
 import httpx
 
-TIMEOUT = 120.0
+TIMEOUT = 600.0
 
 # Known multimodal model name patterns
 MULTIMODAL_PATTERNS = [
     "llava", "bakllava", "moondream", "llama3.2-vision",
     "gemma3", "minicpm-v", "llava-llama3", "llava-phi3",
-    "vision", "-vl", "cogvlm", "gpt-4o", "gemini", "claude-3-5"
+    "vision", "-vl", "cogvlm", "gpt-4o", "gemini", "claude-3",
+    "ocr", "pixtral", "gpt-4"
 ]
 
+
+import asyncio
+
+OLLAMA_MULTIMODAL_CACHE = {}
+
+async def _check_ollama_multimodal(client, base_url, model_name):
+    """Query /api/show to inspect model_info for vision/mm keys."""
+    try:
+        r = await client.post(f"{base_url}/api/show", json={"name": model_name})
+        r.raise_for_status()
+        info = r.json().get("model_info", {})
+        # If any key has 'vision' or 'mm' inside its namespace, it's multimodal
+        for key in info.keys():
+            parts = key.lower().split('.')
+            if "vision" in parts or "clip" in parts or "mm" in parts:
+                return model_name, True
+        return model_name, False
+    except Exception:
+        return model_name, False
 
 async def detect_models(config: dict = None) -> list[str]:
     """Return list of available models for the configured provider."""
@@ -29,10 +49,18 @@ async def detect_models(config: dict = None) -> list[str]:
     if provider == "ollama":
         base_url = config.get("ollama_base", "http://localhost:11434")
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(f"{base_url}/api/tags")
                 r.raise_for_status()
-                return [m["name"] for m in r.json().get("models", [])]
+                models = [m["name"] for m in r.json().get("models", [])]
+                
+                # Dynamically check multimodal capabilities for all models concurrently
+                tasks = [_check_ollama_multimodal(client, base_url, m) for m in models]
+                results = await asyncio.gather(*tasks)
+                for name, is_mm in results:
+                    OLLAMA_MULTIMODAL_CACHE[name] = is_mm
+                    
+                return models
         except Exception:
             return []
     
@@ -48,9 +76,16 @@ async def detect_models(config: dict = None) -> list[str]:
     return []
 
 
+
 def is_multimodal(model: str) -> bool:
-    """Heuristic: check if model name suggests vision/multimodal capability."""
+    """Check if a model is multimodal dynamically via cache or fallback to heuristic."""
     if not model: return False
+    
+    # Check dynamic cache first
+    if model in OLLAMA_MULTIMODAL_CACHE:
+        if OLLAMA_MULTIMODAL_CACHE[model]:
+            return True
+            
     m = model.lower()
     return any(p in m for p in MULTIMODAL_PATTERNS)
 

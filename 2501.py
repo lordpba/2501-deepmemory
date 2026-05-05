@@ -474,41 +474,63 @@ def main():
         migrate_wiki_logic(ghost)
         sys.exit(0)
 
-    # Export API keys from Ghost config
+    # Extract LLM Config from Ghost
     config = ghost.read_config() or {}
-    if config.get("openai_api_key"):
-        os.environ["OPENAI_API_KEY"] = config["openai_api_key"]
-    if config.get("gemini_api_key"):
-        os.environ["GEMINI_API_KEY"] = config["gemini_api_key"]
+    llm_config = config.get("llm_config")
+    
+    # Fallback to legacy config if llm_config is not set
+    if not llm_config:
+        if config.get("openai_api_key"):
+            llm_config = {"provider": "openai", "api_key": config["openai_api_key"]}
+        elif config.get("gemini_api_key"):
+            llm_config = {"provider": "gemini", "api_key": config["gemini_api_key"]}
+        else:
+            llm_config = {"provider": "ollama", "ollama_base": "http://localhost:11434"}
+            
+        # Migrate legacy to new format
+        ghost.write_config({"llm_config": llm_config})
 
-    # Detect Ollama models
-    print("  Detecting Ollama models...")
+    # Detect models based on configured provider
+    provider = llm_config.get("provider", "ollama")
+    print(f"  Detecting models for provider: {provider}...")
     try:
-        models = asyncio.run(llm.detect_models())
-    except Exception:
+        models = asyncio.run(llm.detect_models(llm_config))
+    except Exception as e:
+        print(f"  ⚠ Could not detect models: {e}")
         models = []
 
     model = "none"
     if models:
         model = select_model(models)
     else:
-        print("\n  ⚠ No Ollama models found.")
-        # Check if we have an API config in the Ghost
-        provider = config.get("llm_provider")
-        
-        if provider in ["openai", "gemini"]:
-            print(f"  Using configured provider: {provider}")
-            model = "gpt-4o-mini" if provider == "openai" else "gemini-1.5-flash"
-        else:
-            ans = input("  Would you like to configure an API key (OpenAI/Gemini)? (y/N): ").strip().lower()
+        print(f"\n  ⚠ No models found for {provider}.")
+        if provider == "ollama":
+            ans = input("  Would you like to configure an API key (OpenAI/Gemini/Claude) instead? (y/N): ").strip().lower()
             if ans == "y":
-                model = configure_api(ghost)
-                # Re-export after configuration
-                new_config = ghost.read_config()
-                if new_config.get("openai_api_key"): os.environ["OPENAI_API_KEY"] = new_config["openai_api_key"]
-                if new_config.get("gemini_api_key"): os.environ["GEMINI_API_KEY"] = new_config["gemini_api_key"]
-            else:
-                print("  Running without LLM. Some features will be disabled.")
+                # Fallback CLI setup for APIs if Ollama is down and UI isn't reached yet
+                print("\n  --- External LLM Configuration ---")
+                print("  1. OpenAI")
+                print("  2. Gemini")
+                print("  3. Anthropic Claude")
+                choice = input("\n  Choose provider [1]: ").strip() or "1"
+                
+                if choice == "1":
+                    key = getpass("  OpenAI API Key: ").strip()
+                    llm_config = {"provider": "openai", "api_key": key}
+                    model = "gpt-4o-mini"
+                elif choice == "2":
+                    key = getpass("  Gemini API Key: ").strip()
+                    llm_config = {"provider": "gemini", "api_key": key}
+                    model = "gemini-1.5-flash"
+                elif choice == "3":
+                    key = getpass("  Claude API Key: ").strip()
+                    llm_config = {"provider": "claude", "api_key": key}
+                    model = "claude-3-haiku-20240307"
+                
+                ghost.write_config({"llm_config": llm_config})
+                print(f"  Provider {llm_config['provider']} saved.")
+        else:
+            print("  Running without LLM. Some features will be disabled.")
 
     # Load ghost instructions
     instructions_path = script_dir / "ghost_instructions.md"
