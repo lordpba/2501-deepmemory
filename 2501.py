@@ -40,7 +40,7 @@ def _local_python() -> Path:
 
 
 def _ensure_local_venv() -> None:
-    libs_dir = script_dir / "libs"
+    libs_dir = script_dir / f"libs_{os.name}"
     if not venv_dir.exists() and not libs_dir.exists():
         print("Creating local virtual environment...")
         try:
@@ -63,7 +63,7 @@ def _ensure_local_venv() -> None:
     if libs_dir.exists():
         env["PYTHONPATH"] = str(libs_dir) + os.pathsep + env.get("PYTHONPATH", "")
 
-    check_cmd = [str(python_exe), "-c", "import httpx"]
+    check_cmd = [str(python_exe), "-c", "import httpx; import cryptography"]
     check_import = subprocess.run(check_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     
     if check_import.returncode != 0:
@@ -73,6 +73,9 @@ def _ensure_local_venv() -> None:
             subprocess.run([str(_local_python()), "-m", "pip", "install", "-r", str(script_dir / "requirements.txt")], check=True)
         else:
             # Install to libs folder
+            if libs_dir.exists():
+                shutil.rmtree(libs_dir)
+            libs_dir.mkdir(exist_ok=True)
             subprocess.run([sys.executable, "-m", "pip", "install", "-t", str(libs_dir), "-r", str(script_dir / "requirements.txt")], check=True)
 
     if not _in_local_venv() and venv_dir.exists() and _local_python().exists():
@@ -85,7 +88,7 @@ _ensure_local_venv()
 # --- Portable Dependency Support ---
 # If a 'libs' folder exists in the script directory, add it to sys.path.
 # This allows carrying dependencies on USB sticks (FAT32/exFAT) where venv symlinks fail.
-libs_dir = script_dir / "libs"
+libs_dir = script_dir / f"libs_{os.name}"
 if libs_dir.exists():
     sys.path.insert(0, str(libs_dir))
 # ----------------------------------
@@ -128,18 +131,33 @@ def is_writable(path: Path) -> bool:
 
 
 def get_usb_drives():
-    """Detect potential USB mount points on Linux, filtering for writable ones."""
+    """Detect potential USB mount points on Linux and Windows, filtering for writable ones."""
     drives = []
-    user = os.environ.get("USER")
-    search_paths = [Path(f"/media/{user}"), Path(f"/run/media/{user}")]
-    
-    for base in search_paths:
-        if base.exists():
-            for d in base.iterdir():
-                if d.is_dir():
-                    # Only add if writable
-                    if is_writable(d):
-                        drives.append(d)
+    if os.name == "nt":
+        import ctypes
+        import string
+        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+        for letter in string.ascii_uppercase:
+            if bitmask & 1:
+                drive = f"{letter}:\\"
+                drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive)
+                # 2=REMOVABLE, 3=FIXED. We ignore C:
+                if drive_type in (2, 3) and letter != 'C':
+                    path = Path(drive)
+                    if is_writable(path):
+                        drives.append(path)
+            bitmask >>= 1
+    else:
+        user = os.environ.get("USER")
+        search_paths = [Path(f"/media/{user}"), Path(f"/run/media/{user}")]
+        
+        for base in search_paths:
+            if base.exists():
+                for d in base.iterdir():
+                    if d.is_dir():
+                        # Only add if writable
+                        if is_writable(d):
+                            drives.append(d)
     return drives
 
 
@@ -204,7 +222,7 @@ def deploy_to_usb(source_dir: Path):
         to_copy = [
             "2501.py", "run.sh", "run.bat", "core", "ui", "ghost_instructions.md", 
             "requirements.txt", "name_your_ghost.png", "The Abstraction Fallacy.pdf", "README.md",
-            "ui/static/favicon.png"
+            "ui/static/favicon.png", "libs_nt", "libs_posix"
         ]
         
         if not is_update:

@@ -11,11 +11,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Check if requirements are installed (heuristic: check if bs4 is available)
-python -c "import sys; sys.path.insert(0, './libs'); import bs4" >nul 2>&1
+:: Check if requirements are installed (heuristic: check if bs4 and cryptography are available)
+python -c "import sys; sys.path.insert(0, './libs'); import bs4; import cryptography" >nul 2>&1
 if %errorlevel% neq 0 (
     echo Installing requirements into local 'libs' folder...
-    if not exist "libs" mkdir libs
+    if exist "libs" rmdir /s /q libs
+    mkdir libs
     python -m pip install --target ./libs -r requirements.txt
     if %errorlevel% neq 0 (
         echo Error: Failed to install requirements.
