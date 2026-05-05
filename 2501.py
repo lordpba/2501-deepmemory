@@ -20,6 +20,12 @@ import webbrowser
 from getpass import getpass
 from pathlib import Path
 
+if os.name == "nt":
+    # Force UTF-8 encoding in Windows console to prevent getpass from mangling special characters
+    import ctypes
+    ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+    ctypes.windll.kernel32.SetConsoleCP(65001)
+
 script_dir = Path(__file__).parent.absolute()
 venv_dir = script_dir / "venv"
 
@@ -80,7 +86,10 @@ def _ensure_local_venv() -> None:
 
     if not _in_local_venv() and venv_dir.exists() and _local_python().exists():
         print("Restarting with the local virtual environment...")
-        os.execv(str(python_exe), [str(python_exe), str(__file__), *sys.argv[1:]])
+        if os.name == "nt":
+            sys.exit(subprocess.call([str(python_exe), str(__file__)] + sys.argv[1:]))
+        else:
+            os.execv(str(python_exe), [str(python_exe), str(__file__), *sys.argv[1:]])
 
 
 _ensure_local_venv()
@@ -471,7 +480,13 @@ def main():
         sys.exit(0)
 
     # Auto-ask for deployment if not on a USB
-    if "/media/" not in str(script_dir) and "/run/media/" not in str(script_dir):
+    is_usb = False
+    for d in get_usb_drives():
+        if str(script_dir).startswith(str(d)):
+            is_usb = True
+            break
+            
+    if not is_usb:
         ans = input("  Do you want to deploy this 2501 to a USB stick? (y/N): ").strip().lower()
         if ans == "y":
             if deploy_to_usb(script_dir):

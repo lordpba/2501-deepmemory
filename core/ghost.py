@@ -84,7 +84,7 @@ class Ghost:
         ghost._fernet = ghost._derive_fernet(password, salt)
         try:
             ghost._read("identity/meta.json")
-        except (InvalidToken, Exception):
+        except InvalidToken:
             raise WrongPasswordError("Wrong password")
             
         (ghost.path / "raw").mkdir(exist_ok=True)

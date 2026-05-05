@@ -710,6 +710,7 @@ function switchTab(tab) {
     if (!state.graphRendered) renderGraph();
   } else if (tab === 'page') {
     $('viewPage').style.display = 'flex';
+    $('viewPage').style.flexDirection = 'column';
     $('tabPage').classList.add('active');
     tabPage.style.display = 'inline-block';
     pageSearch.style.display = 'none';
