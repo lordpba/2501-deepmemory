@@ -10,8 +10,6 @@
 > *"Your Ghost travels with you. The Shell is just borrowed."*
 > — inspired by Project 2501, Ghost in the Shell (Masamune Shirow)
 
-![2501 Ghost](name_your_ghost.png)
-
 ## 🎥 Demonstration
 ![2501 Demo](2501.gif)
 
