@@ -12,8 +12,8 @@
 
 ![2501 Ghost](name_your_ghost.png)
 
-## 🎥 Video Demonstration
-<video src="2501.mp4" width="100%" controls></video>
+## 🎥 Demonstration
+![2501 Demo](2501.gif)
 
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
