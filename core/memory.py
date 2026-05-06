@@ -4,6 +4,7 @@ Called automatically during conversation pauses (wake cycle).
 """
 
 import datetime
+from pathlib import Path
 from typing import Callable, Awaitable
 
 from core.ghost import Ghost

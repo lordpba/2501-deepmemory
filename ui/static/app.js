@@ -724,7 +724,7 @@ function switchTab(tab) {
     $('tabGraph').classList.add('active');
     tabPage.style.display = 'none';
     pageSearch.style.display = 'none';
-    if (!state.graphRendered) renderGraph();
+    loadGraph();
   } else if (tab === 'page') {
     $('viewPage').style.display = 'flex';
     $('viewPage').style.flexDirection = 'column';
