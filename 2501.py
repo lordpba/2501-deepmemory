@@ -368,8 +368,44 @@ def main():
             llm_config = {"provider": "ollama", "ollama_base": "http://localhost:11434"}
         ghost.write_config({"llm_config": llm_config})
 
+    print("\n  Select LLM Configuration:")
+    print("  [1] Ollama (Local/Network)")
+    print("  [2] Remote API (OpenAI/Gemini/Claude/ReiLab)")
+    print("  [3] Use last saved configuration")
+    
+    start_choice = input("\n  Choose [3]: ").strip() or "3"
+    
+    if start_choice == "1":
+        ip = input("  Enter Ollama IP endpoint (default: localhost): ").strip()
+        if not ip:
+            ip = "localhost"
+        if not ip.startswith("http"):
+            ip = f"http://{ip}"
+        if ":" not in ip.replace("http://", "").replace("https://", ""):
+            ip += ":11434"
+        llm_config = {"provider": "ollama", "ollama_base": ip}
+        ghost.write_config({"llm_config": llm_config})
+        
+    elif start_choice == "2":
+        print("\n  --- External LLM Configuration ---")
+        print("  1. OpenAI")
+        print("  2. Gemini")
+        print("  3. Anthropic Claude")
+        print("  4. ReiLab")
+        api_choice = input("\n  Choose provider [1]: ").strip() or "1"
+        if api_choice == "1":
+            llm_config = {"provider": "openai", "api_key": getpass("  OpenAI API Key: ").strip()}
+        elif api_choice == "2":
+            llm_config = {"provider": "gemini", "api_key": getpass("  Gemini API Key: ").strip()}
+        elif api_choice == "3":
+            llm_config = {"provider": "claude", "api_key": getpass("  Claude API Key: ").strip()}
+        elif api_choice == "4":
+            llm_config = {"provider": "reilab", "api_key": getpass("  ReiLab API Key: ").strip()}
+        ghost.write_config({"llm_config": llm_config})
+        print(f"  ✓ Provider {llm_config['provider']} saved.")
+
     provider = llm_config.get("provider", "ollama")
-    print(f"  Detecting models for provider: {provider}...")
+    print(f"\n  Detecting models for provider: {provider}...")
     
     if provider == "ollama":
         is_available, check_msg, model_count = asyncio.run(llm.check_ollama_available(llm_config))
@@ -409,10 +445,10 @@ def main():
 
                 if not is_available:
                     print(f"\n  Would you like to configure an alternative LLM provider?")
-                    ans = input(f"  (1=OpenAI, 2=Gemini, 3=Claude, 0=Try anyway): ").strip() or "0"
-                    if ans in ["1", "2", "3"]:
-                        provider_map = {"1": "openai", "2": "gemini", "3": "claude"}
-                        key_names = {"1": "OpenAI", "2": "Gemini", "3": "Claude"}
+                    ans = input(f"  (1=OpenAI, 2=Gemini, 3=Claude, 4=ReiLab, 0=Try anyway): ").strip() or "0"
+                    if ans in ["1", "2", "3", "4"]:
+                        provider_map = {"1": "openai", "2": "gemini", "3": "claude", "4": "reilab"}
+                        key_names = {"1": "OpenAI", "2": "Gemini", "3": "Claude", "4": "ReiLab"}
                         chosen_provider = provider_map[ans]
                         api_key = getpass(f"  {key_names[ans]} API Key: ").strip()
                         llm_config = {"provider": chosen_provider, "api_key": api_key}
@@ -428,7 +464,17 @@ def main():
 
     model = "none"
     if models:
-        model = select_model(models)
+        # Read the most recent config to get last_model
+        current_config = ghost.read_config() or {}
+        last_model = current_config.get("last_model")
+        
+        if start_choice == "3" and last_model in models:
+            model = last_model
+            print(f"  ✓ Automatically selected last saved model: {model}")
+        else:
+            model = select_model(models)
+            current_config["last_model"] = model
+            ghost.write_config(current_config)
     else:
         print(f"\n  ⚠ No models found for {provider}.")
         if provider == "ollama":
@@ -438,6 +484,7 @@ def main():
                 print("  1. OpenAI")
                 print("  2. Gemini")
                 print("  3. Anthropic Claude")
+                print("  4. ReiLab")
                 choice = input("\n  Choose provider [1]: ").strip() or "1"
                 if choice == "1":
                     llm_config = {"provider": "openai", "api_key": getpass("  OpenAI API Key: ").strip()}
@@ -448,6 +495,9 @@ def main():
                 elif choice == "3":
                     llm_config = {"provider": "claude", "api_key": getpass("  Claude API Key: ").strip()}
                     model = "claude-3-haiku-20240307"
+                elif choice == "4":
+                    llm_config = {"provider": "reilab", "api_key": getpass("  ReiLab API Key: ").strip()}
+                    model = "google/gemini-2.5-flash"
                 ghost.write_config({"llm_config": llm_config})
                 print(f"  Provider {llm_config['provider']} saved.")
         else:

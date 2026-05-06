@@ -111,6 +111,9 @@ async def detect_models(config: dict = None) -> list[str]:
     
     elif provider == "openai":
         return ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+        
+    elif provider == "reilab":
+        return ["google/gemini-2.5-flash"]
     
     elif provider == "gemini":
         return ["gemini-1.5-pro", "gemini-1.5-flash"]
@@ -161,6 +164,15 @@ async def chat(
         )
         full_messages.append({"role": "system", "content": system})
 
+    # Special handling for ReiLab: merge system context into user message
+    # as some Gemini-based endpoints dislike separate system roles.
+    if provider == "reilab" and context:
+        messages = list(messages)
+        if messages and messages[0]["role"] == "user":
+            messages[0] = messages[0].copy()
+            messages[0]["content"] = f"{context}\n\n---\n{messages[0]['content']}"
+            context = "" # Context is now merged
+    
     full_messages.extend(messages)
 
     if provider == "openai":
@@ -169,6 +181,8 @@ async def chat(
         return await _chat_gemini(model, full_messages, images, config.get("api_key"))
     elif provider == "claude":
         return await _chat_claude(model, full_messages, images, config.get("api_key"))
+    elif provider == "reilab":
+        return await _chat_openai(model, full_messages, images, config.get("api_key"), base_url="https://api.reilabs.org/v1/chat/completions")
     else:
         # Default to Ollama
         base_url = config.get("ollama_base", "http://localhost:11434")
@@ -195,9 +209,9 @@ async def _chat_ollama(model: str, messages: list[dict], images: list[str] | Non
         return r.json()["message"]["content"]
 
 
-async def _chat_openai(model: str, messages: list[dict], images: list[str] | None, api_key: str) -> str:
+async def _chat_openai(model: str, messages: list[dict], images: list[str] | None, api_key: str, base_url: str = "https://api.openai.com/v1/chat/completions") -> str:
     if not api_key:
-        return "⚠ OpenAI API key not found."
+        return "⚠ API key not found."
 
     openai_messages = []
     for msg in messages:
@@ -215,11 +229,22 @@ async def _chat_openai(model: str, messages: list[dict], images: list[str] | Non
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         r = await client.post(
-            "https://api.openai.com/v1/chat/completions",
+            base_url,
             headers={"Authorization": f"Bearer {api_key}"},
             json={"model": model, "messages": openai_messages}
         )
-        r.raise_for_status()
+        if r.status_code != 200:
+            error_msg = f"HTTP {r.status_code}"
+            try:
+                details = r.json()
+                if "error" in details:
+                    error_msg += f": {details['error']['message'] if isinstance(details['error'], dict) else details['error']}"
+                else:
+                    error_msg += f": {r.text[:200]}"
+            except:
+                error_msg += f": {r.text[:200]}"
+            return f"⚠ API Error ({base_url}): {error_msg}"
+            
         return r.json()["choices"][0]["message"]["content"]
 
 

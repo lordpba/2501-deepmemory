@@ -120,6 +120,11 @@ async def get_models():
 @app.post("/api/model")
 async def set_model(data: dict):
     _state["model"] = data["model"]
+    ghost: Ghost = _state.get("ghost")
+    if ghost:
+        config = ghost.read_config() or {}
+        config["last_model"] = data["model"]
+        ghost.write_config(config)
     return {"model": _state["model"]}
 
 

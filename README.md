@@ -32,7 +32,7 @@ The Ghost is yours. The machine is just a **Shell** you borrow.
 - **Cross-Platform** — Native launchers for Linux (`run.sh`) and Windows (`run.bat`), plus direct bootstrapping from `python3 2501.py`.
 - **Local venv bootstrap** — `2501.py` creates a repository-local `venv/` on first run and installs `requirements.txt` automatically.
 - **Portable Dependencies** — USB mode still supports a local `libs` folder for portable installs on FAT32/exFAT sticks.
-- **Multi-Provider LLM** — Use local **Ollama** (including remote LAN endpoints), **OpenAI**, **Google Gemini**, or **Anthropic Claude**.
+- **Multi-Provider LLM** — Use local **Ollama** (including remote LAN endpoints), **OpenAI**, **Google Gemini**, **Anthropic Claude**, or **ReiLab API** ([reilabs.org](https://reilabs.org/)).
 - **Secure Key Vault** — Your API keys are stored **encrypted** inside your Ghost. Only you can unlock them.
 - **Hierarchical LLM Wiki** — Obsidian-style tree view. Automatically groups memories into categories (`project`, `knowledge`, `user`).
 - **Multimodal** — Send PDFs, images, and documents for analysis.
@@ -80,7 +80,7 @@ python 2501.py --sync-from-usb
 You can configure your LLM by clicking the **Settings (gear icon)** in the top right of the UI:
 
 - **Ollama**: Specify a local or LAN endpoint (e.g., a DGX server).
-- **Cloud APIs**: Select OpenAI, Gemini, or Claude and enter your API Key.
+- **Cloud APIs**: Select OpenAI, Gemini, Claude, or **ReiLab** and enter your API Key.
 - **Ghost Security**: All settings and memories are Fernet-encrypted (AES-128-CBC + HMAC) using your Ghost password.
 
 ### Setting up Ollama
