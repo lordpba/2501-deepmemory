@@ -305,6 +305,7 @@ async def extract_memories(
     instructions: str,
     existing_pages: list[str] | None = None,
     config: dict = None,
+    images: list[str] | None = None,
 ) -> list[tuple[str, str]]:
     """
     Ask the LLM to extract memories from a conversation.
@@ -340,7 +341,8 @@ async def extract_memories(
         model, 
         [{"role": "user", "content": user_prompt}], 
         context=system_prompt, 
-        config=config
+        config=config,
+        images=images
     )
 
     if "NOTHING_TO_REMEMBER" in response.upper() and len(response) < 50:
