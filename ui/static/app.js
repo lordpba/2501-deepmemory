@@ -7,11 +7,24 @@ const state = {
   currentPage: null,
   editMode: false,
   pendingAttachments: [],   // [{type, content/path, filename, preview?}]
-  isLoading: false,
+  config: null,
   pauseTimer: null,
   ws: null,
   allPages: [],
+  extracting: false,
 };
+
+function showToast(message, duration = 5000) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add('active'), 10);
+  setTimeout(() => {
+    toast.classList.remove('active');
+    setTimeout(() => toast.remove(), 500);
+  }, duration);
+}
 
 const PAUSE_DELAY = 45_000; // 45 seconds before memory extraction
 
@@ -129,8 +142,12 @@ async function loadModels() {
       });
     } else {
       const opt = document.createElement('option');
-      opt.textContent = data.error || 'No models';
+      opt.textContent = '⚠ No models found';
       modelSelect.appendChild(opt);
+      
+      if (state.config && state.config.provider === 'ollama') {
+        showToast('Ollama not found or no models pulled. Visit <a href="https://ollama.com" target="_blank" style="color:var(--accent);text-decoration:underline">ollama.com</a> to install.', 10000);
+      }
     }
   } catch {}
 }
