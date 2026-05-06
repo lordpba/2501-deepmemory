@@ -9,7 +9,7 @@
 ![2501 Ghost](name_your_ghost.png)
 
 ## 🎥 Video Demonstration
-[![Watch the video](https://img.youtube.com/vi/lYb67tLvP2Y/0.jpg)](https://youtu.be/lYb67tLvP2Y)
+<video src="2501.mp4" width="100%" controls></video>
 
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
