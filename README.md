@@ -1,3 +1,7 @@
+
+
+
+
 # 2501 DeepMemory
 > *Portable, Persistent AI Memory.*
 
@@ -8,9 +12,9 @@
 
 ![2501 Ghost](name_your_ghost.png)
 
-## 🎥 Video Demonstration
-<video src="2501.mp4" width="100%" controls></video>
 
+<video src="2501.mp4" width="100%" controls></video>
+https://github.com/user-attachments/assets/7abdad32-7880-45b7-82da-86e4fec92959
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
 ChatGPT doesn't remember you when you move to Claude. Claude doesn't remember you when you move to Llama. Every conversation starts from zero. Your memory belongs to their servers, not to you.
