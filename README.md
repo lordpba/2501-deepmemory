@@ -8,6 +8,9 @@
 
 ![2501 Ghost](name_your_ghost.png)
 
+## 🎥 Video Demonstration
+[![Watch the video](https://img.youtube.com/vi/lYb67tLvP2Y/0.jpg)](https://youtu.be/lYb67tLvP2Y)
+
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
 ChatGPT doesn't remember you when you move to Claude. Claude doesn't remember you when you move to Llama. Every conversation starts from zero. Your memory belongs to their servers, not to you.
