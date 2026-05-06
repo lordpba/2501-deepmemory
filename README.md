@@ -11,7 +11,7 @@
 > — inspired by Project 2501, Ghost in the Shell (Masamune Shirow)
 
 ## 🎥 Demonstration
-![2501 Demo](2501.gif)
+![2501 Demo](2501_long.gif)
 
 **Your AI memory dies every time you switch models. 2501 fixes that.**
 
