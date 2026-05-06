@@ -37,7 +37,7 @@ The Ghost is yours. The machine is just a **Shell** you borrow.
 - **Cross-Platform** — Native launchers for Linux (`run.sh`) and Windows (`run.bat`), plus direct bootstrapping from `python3 2501.py`.
 - **Local venv bootstrap** — `2501.py` creates a repository-local `venv/` on first run and installs `requirements.txt` automatically.
 - **Portable Dependencies** — USB mode still supports a local `libs` folder for portable installs on FAT32/exFAT sticks.
-- **Multi-Provider LLM** — Use local **Ollama** (including remote LAN endpoints), **OpenAI**, **Google Gemini**, **Anthropic Claude**, or **ReiLab API** ([reilabs.org](https://reilabs.org/)).
+- **Multi-Provider LLM** — Use local **Ollama** (including remote LAN endpoints), **OpenAI**, **Google Gemini**, **Anthropic Claude**, and also **ReiLab API** ! ([reilabs.org](https://reilabs.org/)).
 - **Secure Key Vault** — Your API keys are stored **encrypted** inside your Ghost. Only you can unlock them.
 - **Hierarchical LLM Wiki** — Obsidian-style tree view. Automatically groups memories into categories (`project`, `knowledge`, `user`).
 - **Multimodal** — Send PDFs, images, and documents for analysis.
