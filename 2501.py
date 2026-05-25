@@ -97,15 +97,39 @@ def _local_python() -> Path:
         if portable.exists(): return portable
         return venv_dir / "bin" / "python"
 
-def _ensure_local_venv() -> None:
+def _get_libs_dir() -> Path:
+    """Libs are installed per-host (LOCALAPPDATA) when running from USB to avoid
+    path/version mismatches across machines. USB just carries app + portable Python."""
     if _is_running_from_usb():
-        libs_dir = _get_local_env_dir() / f"libs_{os.name}"
-    else:
-        libs_dir = script_dir / f"libs_{os.name}"
-    
+        return _get_local_env_dir() / f"libs_{os.name}"
+    return script_dir / f"libs_{os.name}"
+
+def _pip_install_to(target_dir: Path, requirements: Path) -> bool:
+    """Install requirements to target_dir. Try current Python first, fallback to system Python on PATH."""
+    target_dir.mkdir(exist_ok=True)
+    candidates = [sys.executable]
+    # Portable Python has no pip — try system Python from PATH as fallback
+    for name in ("python", "py", "python3"):
+        exe = shutil.which(name)
+        if exe and exe not in candidates:
+            candidates.append(exe)
+    for exe in candidates:
+        try:
+            r = subprocess.run([exe, "-m", "pip", "install", "-t", str(target_dir), "-r", str(requirements)],
+                               capture_output=True, text=True)
+            if r.returncode == 0:
+                return True
+        except Exception:
+            continue
+    print("  ⚠ No Python with pip found. Install Python from python.org or run deploy from a machine with pip.")
+    return False
+
+def _ensure_local_venv() -> None:
+    libs_dir = _get_libs_dir()
+
     if os.name == "nt":
         if venv_dir.exists(): shutil.rmtree(venv_dir)
-        libs_dir.mkdir(exist_ok=True)
+        libs_dir.mkdir(parents=True, exist_ok=True)
     else:
         if not venv_dir.exists() and not libs_dir.exists():
             print("Creating local virtual environment...")
@@ -129,18 +153,15 @@ def _ensure_local_venv() -> None:
         if venv_dir.exists() and _local_python().exists() and os.name != "nt":
             subprocess.run([str(_local_python()), "-m", "pip", "install", "-r", str(script_dir / "requirements.txt")], check=True)
         else:
-            libs_dir.mkdir(exist_ok=True)
-            subprocess.run([sys.executable, "-m", "pip", "install", "-t", str(libs_dir), "-r", str(script_dir / "requirements.txt")], check=True)
+            if not _pip_install_to(libs_dir, script_dir / "requirements.txt"):
+                raise SystemExit(1)
 
     if not _in_local_venv() and venv_dir.exists() and _local_python().exists() and os.name != "nt":
         os.execv(str(python_exe), [str(python_exe), str(__file__), *sys.argv[1:]])
 
 _ensure_local_venv()
 
-if _is_running_from_usb():
-    libs_dir = _get_local_env_dir() / f"libs_{os.name}"
-else:
-    libs_dir = script_dir / f"libs_{os.name}"
+libs_dir = _get_libs_dir()
 if libs_dir.exists():
     sys.path.insert(0, str(libs_dir))
 
@@ -168,6 +189,7 @@ def parse_args():
     return p.parse_args()
 
 def download_portable_python(target_dir: Path):
+    """Download embedded Python and bootstrap pip (embedded distro ships without it)."""
     url = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip"
     print(f"\n  📥 Downloading Windows Engine...")
     try:
@@ -185,7 +207,32 @@ def download_portable_python(target_dir: Path):
             tmp_p = Path(tmp.name)
         with zipfile.ZipFile(tmp_p, 'r') as z: z.extractall(target_dir)
         tmp_p.unlink()
-        print("\n  ✅ Engine ready.")
+        print("\n  ✅ Engine extracted.")
+
+        # Step 1: patch the ._pth file so site-packages is loaded (required for pip)
+        print("  🔧 Enabling site-packages...")
+        for pth_file in target_dir.glob("python*._pth"):
+            content = pth_file.read_text()
+            if "#import site" in content:
+                pth_file.write_text(content.replace("#import site", "import site"))
+            elif "import site" not in content:
+                pth_file.write_text(content.rstrip() + "\nimport site\n")
+
+        # Step 2: download get-pip.py and run it (ensurepip is not bundled in embedded Python)
+        print("  📥 Bootstrapping pip...")
+        python_exe = target_dir / "python.exe"
+        get_pip = target_dir / "get-pip.py"
+        urllib.request.urlretrieve("https://bootstrap.pypa.io/get-pip.py", get_pip)
+        result = subprocess.run([str(python_exe), str(get_pip), "--no-warn-script-location"],
+                              capture_output=True, text=True, timeout=120)
+        try: get_pip.unlink()
+        except Exception: pass
+
+        if result.returncode == 0:
+            print("  ✅ Pip installed in portable Python.")
+        else:
+            print(f"  ⚠ Pip bootstrap failed: {result.stderr[-200:]}")
+            print("    Portable Python will fall back to system Python for installs.")
         return True
     except Exception as e:
         print(f"\n  ❌ Error: {e}")
@@ -250,17 +297,17 @@ def deploy_to_usb(source_dir: Path):
             return None
 
     print(f"\n  Deploying to {target_dir}...")
-    
+
     include_python = False
-    if not (target_dir / "bin" / "python").exists():
-        if input("\n  Include Windows Portable Engine? (y/N): ").lower() == 'y':
+    if os.name == "nt" and not (target_dir / "bin" / "python").exists():
+        ans = input("\n  Include Windows Portable Engine for portability? (Y/n): ").strip().lower()
+        if ans != 'n':
             include_python = True
             
     target_dir.mkdir(parents=True, exist_ok=True)
+
     if include_python:
         download_portable_python(target_dir / "bin" / "python")
-        print("  📦 Pre-installing Windows libs...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "-t", str(target_dir / "libs_nt"), "-r", "requirements.txt"], check=False)
 
     to_copy = ["2501.py", "run.sh", "run.bat", "core", "ui", "ghost_instructions.md", "requirements.txt"]
     if not is_update: to_copy.append("ghost")
