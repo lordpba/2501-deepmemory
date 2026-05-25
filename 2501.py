@@ -100,9 +100,10 @@ def _local_python() -> Path:
 def _get_libs_dir() -> Path:
     """Libs are installed per-host (LOCALAPPDATA) when running from USB to avoid
     path/version mismatches across machines. USB just carries app + portable Python."""
+    py_ver = f"{sys.version_info.major}{sys.version_info.minor}"
     if _is_running_from_usb():
-        return _get_local_env_dir() / f"libs_{os.name}"
-    return script_dir / f"libs_{os.name}"
+        return _get_local_env_dir() / f"libs_{os.name}_{py_ver}"
+    return script_dir / f"libs_{os.name}_{py_ver}"
 
 def _pip_install_to(target_dir: Path, requirements: Path) -> bool:
     """Install requirements to target_dir. Try current Python first, fallback to system Python on PATH."""
@@ -115,8 +116,14 @@ def _pip_install_to(target_dir: Path, requirements: Path) -> bool:
             candidates.append(exe)
     for exe in candidates:
         try:
-            r = subprocess.run([exe, "-m", "pip", "install", "-t", str(target_dir), "-r", str(requirements)],
-                               capture_output=True, text=True)
+            cmd = [exe, "-m", "pip", "install", "-t", str(target_dir), "-r", str(requirements)]
+            if exe != sys.executable:
+                # We are using a fallback/host python to install packages for the target python.
+                # Force pip to download wheels compatible with the target python's version/platform.
+                py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+                if os.name == "nt":
+                    cmd += ["--python-version", py_ver, "--platform", "win_amd64", "--only-binary=:all:"]
+            r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode == 0:
                 return True
         except Exception:
@@ -164,6 +171,7 @@ _ensure_local_venv()
 libs_dir = _get_libs_dir()
 if libs_dir.exists():
     sys.path.insert(0, str(libs_dir))
+sys.path.insert(0, str(script_dir))
 
 from core.ghost import Ghost, WrongPasswordError
 from core import llm, utils
