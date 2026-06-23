@@ -154,7 +154,7 @@ def _ensure_local_venv() -> None:
     if libs_dir.exists():
         env["PYTHONPATH"] = str(libs_dir) + os.pathsep + env.get("PYTHONPATH", "")
 
-    check_cmd = [str(python_exe if python_exe.exists() else sys.executable), "-c", "import httpx; import cryptography"]
+    check_cmd = [str(python_exe if python_exe.exists() else sys.executable), "-c", "import httpx; import cryptography; import faster_whisper"]
     if subprocess.run(check_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode != 0:
         print("Installing requirements...")
         if venv_dir.exists() and _local_python().exists() and os.name != "nt":

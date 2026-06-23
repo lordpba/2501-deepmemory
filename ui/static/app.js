@@ -12,6 +12,19 @@ const state = {
   ws: null,
   allPages: [],
   extracting: false,
+  voiceSettings: {
+    voice_mode: false,
+    voice_continuous: false,
+    whisper_model: 'base',
+    tts_voice: null,
+  },
+  audioCtx: null,
+  micStream: null,
+  audioProcessor: null,
+  isListening: false,
+  speechDetected: false,
+  silenceTimer: null,
+  recordedSamples: [],
 };
 
 function showToast(message, duration = 5000) {
@@ -121,6 +134,14 @@ async function loadStatus() {
         welcome.textContent = `Hello, ${data.ghost_name}. I'm your Ghost. What's on your mind?`;
       }
     }
+    if (data.voice_settings) {
+      state.voiceSettings = data.voice_settings;
+      $('configVoiceMode').checked = state.voiceSettings.voice_mode;
+      $('configVoiceContinuous').checked = state.voiceSettings.voice_continuous;
+      $('configWhisperModel').value = state.voiceSettings.whisper_model;
+      populateTtsVoices();
+      toggleVoiceFields();
+    }
     if (!data.model) {
       ghostDot.classList.add('offline');
     }
@@ -165,12 +186,16 @@ async function loadConfig() {
   try {
     const r = await fetch('/api/config');
     const data = await r.json();
+    state.config = data;
     if (data.provider) {
       $('configProvider').value = data.provider;
       $('configOllamaBase').value = data.ollama_base || '';
       $('configApiKey').value = data.api_key || '';
       if ($('configSerperKey')) {
         $('configSerperKey').value = data.serper_api_key || '';
+      }
+      if ($('configOllamaThink')) {
+        $('configOllamaThink').value = data.ollama_think || 'default';
       }
       toggleConfigFields(data.provider);
     }
@@ -180,6 +205,14 @@ async function loadConfig() {
 function setupConfigHandlers() {
   $('configBtn').addEventListener('click', () => {
     $('configModal').classList.add('active');
+    $('configVoiceMode').checked = state.voiceSettings.voice_mode;
+    $('configVoiceContinuous').checked = state.voiceSettings.voice_continuous;
+    $('configWhisperModel').value = state.voiceSettings.whisper_model;
+    if ($('configOllamaThink') && state.config) {
+      $('configOllamaThink').value = state.config.ollama_think || 'default';
+    }
+    populateTtsVoices();
+    toggleVoiceFields();
   });
 
   $('configProvider').addEventListener('change', (e) => {
@@ -202,19 +235,40 @@ async function saveConfig() {
   const config = {
     provider: provider,
     ollama_base: $('configOllamaBase').value,
+    ollama_think: $('configOllamaThink') ? $('configOllamaThink').value : 'default',
     api_key: $('configApiKey').value,
     serper_api_key: $('configSerperKey') ? $('configSerperKey').value : ''
   };
 
   setActivity('Updating configuration...', true);
   try {
+    // Save LLM configuration
     const r = await fetch('/api/config', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(config),
     });
     const data = await r.json();
-    if (data.status === 'ok') {
+
+    // Save Voice configuration
+    const voiceConfig = {
+      voice_mode: $('configVoiceMode').checked,
+      voice_continuous: $('configVoiceContinuous').checked,
+      whisper_model: $('configWhisperModel').value,
+      tts_voice: $('configTtsVoice').value,
+    };
+    const r2 = await fetch('/api/voice/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(voiceConfig),
+    });
+    const data2 = await r2.json();
+
+    if (data.status === 'ok' && data2.status === 'ok') {
+      state.voiceSettings = voiceConfig;
+      if (!state.config) state.config = {};
+      state.config.ollama_think = config.ollama_think;
+      toggleVoiceFields();
       closeModal('configModal');
       await loadModels(); // Refresh models for the new provider/endpoint
       setActivity('Configuration updated.');
@@ -245,6 +299,12 @@ function setupInputHandlers() {
   });
 
   sendBtn.addEventListener('click', sendMessage);
+
+  // Microphone toggle button
+  const micBtn = $('micBtn');
+  if (micBtn) {
+    micBtn.addEventListener('click', toggleListening);
+  }
 
   // File input
   fileInput.addEventListener('change', async () => {
@@ -419,6 +479,11 @@ async function sendMessage(overrideText = null, hidden = false) {
 
     // Wire up wiki-links in response
     wireWikiLinks(msgContent);
+
+    // Speak the response if voice mode is enabled
+    if (state.voiceSettings.voice_mode && data.reply) {
+      speakText(data.reply);
+    }
 
   } catch (e) {
     typingEl.classList.remove('typing');
@@ -957,3 +1022,287 @@ async function deletePage() {
     setActivity(`⚠ Delete failed: ${e.message}`);
   }
 }
+
+// ── Voice Control Logic ────────────────────
+function toggleVoiceFields() {
+  const enabled = state.voiceSettings.voice_mode;
+  const modelGroup = $('voiceModelGroup');
+  const ttsGroup = $('voiceTtsGroup');
+  const micBtn = $('micBtn');
+  if (modelGroup) modelGroup.style.display = enabled ? 'block' : 'none';
+  if (ttsGroup) ttsGroup.style.display = enabled ? 'block' : 'none';
+  if (micBtn) micBtn.style.display = enabled ? 'flex' : 'none';
+}
+
+function populateTtsVoices() {
+  const synth = window.speechSynthesis;
+  if (!synth || !synth.getVoices) return;
+
+  const getVoices = () => {
+    const voices = synth.getVoices();
+    if (!voices) return;
+    const italianVoices = voices.filter(v => v && v.lang && v.lang.startsWith('it'));
+    const dropdown = $('configTtsVoice');
+    if (!dropdown) return;
+    dropdown.innerHTML = '';
+
+    if (italianVoices.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No Italian voice found (system default)';
+      dropdown.appendChild(opt);
+      return;
+    }
+
+    italianVoices.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      opt.textContent = `${v.name} (${v.lang})`;
+      if (v.name === state.voiceSettings.tts_voice) {
+        opt.selected = true;
+      }
+      dropdown.appendChild(opt);
+    });
+  };
+
+  getVoices();
+  if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = getVoices;
+  }
+}
+
+function speakText(text) {
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+
+  synth.cancel();
+
+  // Clean code blocks and markdown formatting to make reading natural
+  let clean = text
+    .replace(/```[\s\S]*?```/g, '') // remove code blocks
+    .replace(/`[^`]+`/g, '') // remove inline code
+    .replace(/\[\[([^\]]+)\]\]/g, '$1') // replace [[page]] with page
+    .replace(/ACTION:\s*(SEARCH|READ)\s+\[(.*?)\]/gi, '')
+    .replace(/ACTION:\s*(SEARCH|READ)\s+(.*)/gi, '')
+    .replace(/[*_#\-|>]/g, '') // remove markdown symbols
+    .trim();
+
+  if (!clean) return;
+
+  const utterance = new SpeechSynthesisUtterance(clean);
+  const voices = synth.getVoices();
+  let selected = voices.find(v => v.name === state.voiceSettings.tts_voice);
+  if (!selected) {
+    selected = voices.find(v => v.lang && v.lang.startsWith('it'));
+  }
+
+  if (selected) {
+    utterance.voice = selected;
+  } else {
+    utterance.lang = 'it-IT';
+  }
+
+  utterance.onend = () => {
+    if (state.voiceSettings.voice_mode && state.voiceSettings.voice_continuous) {
+      setTimeout(startListening, 300);
+    }
+  };
+
+  synth.speak(utterance);
+}
+
+function startListening() {
+  if (state.isListening) return;
+
+  window.speechSynthesis.cancel();
+
+  navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: 1,
+      sampleRate: 16000,
+      echoCancellation: true,
+      noiseSuppression: true
+    }
+  }).then(stream => {
+    state.micStream = stream;
+    state.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+
+    const source = state.audioCtx.createMediaStreamSource(stream);
+    state.audioProcessor = state.audioCtx.createScriptProcessor(4096, 1, 1);
+
+    state.recordedSamples = [];
+    state.speechDetected = false;
+    if (state.silenceTimer) clearTimeout(state.silenceTimer);
+    state.silenceTimer = null;
+
+    const SILENCE_THRESHOLD = 0.015;
+    const SILENCE_DURATION = 1500;
+
+    state.audioProcessor.onaudioprocess = function(e) {
+      if (!state.isListening) return;
+      const inputData = e.inputBuffer.getChannelData(0);
+      state.recordedSamples.push(new Float32Array(inputData));
+
+      let sum = 0;
+      for (let i = 0; i < inputData.length; i++) {
+        sum += inputData[i] * inputData[i];
+      }
+      let rms = Math.sqrt(sum / inputData.length);
+
+      if (state.voiceSettings.voice_continuous) {
+        if (rms > SILENCE_THRESHOLD) {
+          state.speechDetected = true;
+          if (state.silenceTimer) {
+            clearTimeout(state.silenceTimer);
+            state.silenceTimer = null;
+          }
+        } else if (state.speechDetected) {
+          if (!state.silenceTimer) {
+            state.silenceTimer = setTimeout(() => {
+              console.log("VAD: silence detected, sending...");
+              stopListeningAndSend();
+            }, SILENCE_DURATION);
+          }
+        }
+      }
+    };
+
+    source.connect(state.audioProcessor);
+    state.audioProcessor.connect(state.audioCtx.destination);
+
+    state.isListening = true;
+    $('micBtn').style.color = '#ef4444';
+    $('micRecordIndicator').style.display = 'block';
+    setActivity('Listening...', false);
+  }).catch(err => {
+    console.error("Microphone access failed:", err);
+    showToast("Microphone access failed: " + err.message);
+  });
+}
+
+async function stopListeningAndSend() {
+  if (!state.isListening) return;
+
+  state.isListening = false;
+  $('micBtn').style.color = 'var(--text-dim)';
+  $('micRecordIndicator').style.display = 'none';
+  setActivity('Processing voice...', true);
+
+  if (state.audioProcessor) state.audioProcessor.disconnect();
+  if (state.audioCtx) state.audioCtx.close();
+  if (state.micStream) {
+    state.micStream.getTracks().forEach(t => t.stop());
+  }
+  if (state.silenceTimer) clearTimeout(state.silenceTimer);
+
+  const totalLength = state.recordedSamples.reduce((acc, buf) => acc + buf.length, 0);
+  if (totalLength === 0) {
+    setActivity('No audio recorded.');
+    return;
+  }
+
+  const samples = new Float32Array(totalLength);
+  let offset = 0;
+  for (const buf of state.recordedSamples) {
+    samples.set(buf, offset);
+    offset += buf.length;
+  }
+
+  const wavBlob = encodeWav(samples, 16000);
+  const formData = new FormData();
+  formData.append('file', wavBlob, 'recording.wav');
+
+  try {
+    const r = await fetch('/api/voice/transcribe', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await r.json();
+
+    if (data.error) {
+      setActivity(`STT Error: ${data.error}`);
+    } else if (data.text && data.text.trim()) {
+      setActivity('Transcribed: ' + data.text);
+      userInput.value = data.text;
+      userInput.dispatchEvent(new Event('input'));
+      sendMessage();
+    } else {
+      setActivity('No speech detected.');
+    }
+  } catch (e) {
+    setActivity(`Voice error: ${e.message}`);
+  }
+}
+
+function toggleListening() {
+  if (state.isListening) {
+    stopListeningAndSend();
+  } else {
+    startListening();
+  }
+}
+
+function encodeWav(samples, sampleRate) {
+  let buffer = new ArrayBuffer(44 + samples.length * 2);
+  let view = new DataView(buffer);
+
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+
+  for (let i = 0; i < samples.length; i++) {
+    let s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+
+  return new Blob([view], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+// Inject custom pulse style for microphone recording indicator
+const micStyle = document.createElement('style');
+micStyle.innerHTML = `
+  @keyframes mic-pulse {
+    0% { transform: scale(0.9); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.7; }
+    100% { transform: scale(0.9); opacity: 1; }
+  }
+  #micRecordIndicator {
+    animation: mic-pulse 1.2s infinite ease-in-out;
+  }
+`;
+document.head.appendChild(micStyle);
+
+// First interaction listener to bypass browser audio autoplay restrictions
+const unlockAudio = () => {
+  if (state.voiceSettings.voice_mode) {
+    console.log("Audio unlocked by user interaction");
+    const synth = window.speechSynthesis;
+    if (synth) {
+      const u = new SpeechSynthesisUtterance("");
+      synth.speak(u);
+    }
+    if (state.voiceSettings.voice_continuous && !state.isListening) {
+      startListening();
+    }
+  }
+  window.removeEventListener('click', unlockAudio);
+  window.removeEventListener('keydown', unlockAudio);
+};
+window.addEventListener('click', unlockAudio);
+window.addEventListener('keydown', unlockAudio);

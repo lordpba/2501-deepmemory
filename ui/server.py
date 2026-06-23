@@ -36,6 +36,14 @@ _state: dict = {
     "ws_clients": set(),
     "extracting": False,
     "llm_config": {},  # provider, ollama_base, api_key
+    "voice_settings": {
+        "voice_mode": False,
+        "voice_continuous": False,
+        "whisper_model": "base",
+        "tts_voice": None,
+    },
+    "whisper_model_instance": None,
+    "whisper_model_size": None,
 }
 
 
@@ -91,6 +99,7 @@ async def status():
         "model": _state["model"],
         "multimodal": llm.is_multimodal(_state["model"]) if _state["model"] else False,
         "page_count": len(ghost.list_wiki_pages()) if ghost else 0,
+        "voice_settings": _state["voice_settings"],
     }
 
 
@@ -104,8 +113,75 @@ async def update_config(data: dict):
     _state["llm_config"] = data
     ghost: Ghost = _state["ghost"]
     if ghost:
-        ghost.write_config({"llm_config": data})
+        config = ghost.read_config() or {}
+        config["llm_config"] = data
+        ghost.write_config(config)
     return {"status": "ok"}
+
+
+@app.get("/api/voice/config")
+async def get_voice_config():
+    return _state["voice_settings"]
+
+
+@app.post("/api/voice/config")
+async def update_voice_config(data: dict):
+    _state["voice_settings"].update({
+        "voice_mode": data.get("voice_mode", False),
+        "voice_continuous": data.get("voice_continuous", False),
+        "whisper_model": data.get("whisper_model", "base"),
+        "tts_voice": data.get("tts_voice", None),
+    })
+    ghost: Ghost = _state["ghost"]
+    if ghost:
+        config = ghost.read_config() or {}
+        config.update(_state["voice_settings"])
+        ghost.write_config(config)
+    return {"status": "ok"}
+
+
+def get_whisper_model():
+    model_size = _state["voice_settings"].get("whisper_model", "base")
+    if _state.get("whisper_model_instance") is None or _state.get("whisper_model_size") != model_size:
+        from faster_whisper import WhisperModel
+        print(f"Loading Whisper model '{model_size}'...")
+        _state["whisper_model_instance"] = WhisperModel(model_size, device="cpu", compute_type="int8")
+        _state["whisper_model_size"] = model_size
+    return _state["whisper_model_instance"]
+
+
+@app.post("/api/voice/transcribe")
+async def voice_transcribe(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        import wave
+        import io
+        import numpy as np
+
+        with wave.open(io.BytesIO(content), 'rb') as w:
+            params = w.getparams()
+            if params.nchannels != 1:
+                return JSONResponse(status_code=400, content={"error": "Audio must be mono (1 channel)"})
+            if params.framerate != 16000:
+                return JSONResponse(status_code=400, content={"error": f"Audio must be 16000Hz (received {params.framerate}Hz)"})
+            
+            frames = w.readframes(params.nframes)
+            
+            if params.sampwidth == 2:
+                audio_np = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+            elif params.sampwidth == 4:
+                audio_np = np.frombuffer(frames, dtype=np.float32)
+            else:
+                return JSONResponse(status_code=400, content={"error": f"Unsupported sample width {params.sampwidth}"})
+
+        model = get_whisper_model()
+        segments, info = model.transcribe(audio_np, beam_size=5, language="it")
+        text = " ".join([segment.text for segment in segments]).strip()
+        return {"text": text}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.get("/api/models")
@@ -191,9 +267,10 @@ async def chat_endpoint(data: dict):
             session.add("assistant", reply)
             
             if action_type == "SEARCH":
-                await broadcast({"type": "activity", "message": f"🔍 Searching web for '{action_arg}'..."})
                 config = ghost.read_config() or {}
                 serper_key = config.get("serper_api_key")
+                engine = "Serper.dev" if serper_key else "DuckDuckGo"
+                await broadcast({"type": "activity", "message": f"🔍 Searching web ({engine}) for '{action_arg}'..."})
                 observation = await search_web(action_arg, serper_key)
                 session.add("user", f"OBSERVATION from search '{action_arg}':\n{observation}")
                 
@@ -483,12 +560,20 @@ def start(ghost: Ghost, model: str, instructions: str, port: int = 2501):
     _state["instructions"] = instructions
     
     # Load config from Ghost if present
-    stored = ghost.read_config()
-    if stored and "llm_config" in stored:
+    stored = ghost.read_config() or {}
+    if "llm_config" in stored:
         _state["llm_config"] = stored["llm_config"]
     else:
         # Default config
         _state["llm_config"] = {"provider": "ollama", "ollama_base": "http://localhost:11434"}
+
+    # Load voice settings from config
+    _state["voice_settings"] = {
+        "voice_mode": stored.get("voice_mode", False),
+        "voice_continuous": stored.get("voice_continuous", False),
+        "whisper_model": stored.get("whisper_model", "base"),
+        "tts_voice": stored.get("tts_voice", None),
+    }
 
     # Lightweight pre-flight check for Ollama (async, so we use asyncio.run)
     if _state["llm_config"].get("provider") == "ollama":

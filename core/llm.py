@@ -186,10 +186,10 @@ async def chat(
     else:
         # Default to Ollama
         base_url = config.get("ollama_base", "http://localhost:11434")
-        return await _chat_ollama(model, full_messages, images, base_url)
+        return await _chat_ollama(model, full_messages, images, base_url, config)
 
 
-async def _chat_ollama(model: str, messages: list[dict], images: list[str] | None, base_url: str) -> str:
+async def _chat_ollama(model: str, messages: list[dict], images: list[str] | None, base_url: str, config: dict | None = None) -> str:
     # Attach images to the last user message if model supports it
     if images and is_multimodal(model):
         encoded = []
@@ -203,6 +203,17 @@ async def _chat_ollama(model: str, messages: list[dict], images: list[str] | Non
                 break
 
     payload = {"model": model, "messages": messages, "stream": False}
+    
+    if config:
+        think = config.get("ollama_think")
+        if think == "yes":
+            payload["think"] = True
+        elif think == "no":
+            payload["think"] = False
+
+    # Debug print to terminal
+    print(f"  [LLM] Requesting Ollama model '{model}' (think={payload.get('think', 'default')})...")
+
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         r = await client.post(f"{base_url}/api/chat", json=payload)
         r.raise_for_status()
