@@ -39,6 +39,7 @@ class Ghost:
     def __init__(self, path: str):
         self.path = Path(path)
         self._fernet: Fernet | None = None
+        self._wiki_cache: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Creation and unlocking
@@ -141,10 +142,16 @@ class Ghost:
         return p.read_bytes()
 
     def read_wiki_page(self, name: str) -> str:
-        return self._read(f"wiki/{name}.md").decode("utf-8")
+        if name in self._wiki_cache:
+            # Safe caching in memory
+            return self._wiki_cache[name]
+        content = self._read(f"wiki/{name}.md").decode("utf-8")
+        self._wiki_cache[name] = content
+        return content
 
     def write_wiki_page(self, name: str, content: str):
         self._write(f"wiki/{name}.md", content.encode("utf-8"))
+        self._wiki_cache[name] = content
 
     def wiki_page_exists(self, name: str) -> bool:
         return (self.path / "wiki" / f"{name}.md.enc").exists()
@@ -153,6 +160,8 @@ class Ghost:
         path = self.path / "wiki" / f"{name}.md.enc"
         if path.exists():
             path.unlink()
+        if name in self._wiki_cache:
+            del self._wiki_cache[name]
 
     # ------------------------------------------------------------------
     # Session operations

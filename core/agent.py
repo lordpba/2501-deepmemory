@@ -2,8 +2,23 @@ import httpx
 from bs4 import BeautifulSoup
 import re
 
+# In-memory caches for the session duration
+_SEARCH_CACHE = {}
+_WEBPAGE_CACHE = {}
+
 async def search_web(query: str, serper_api_key: str = None) -> str:
     """Search the web for a query using Serper API, or fallback to simple DuckDuckGo HTML parsing."""
+    cache_key = (query, bool(serper_api_key))
+    if cache_key in _SEARCH_CACHE:
+        print(f"  [Cache] Retrieval for search query: '{query}'")
+        return _SEARCH_CACHE[cache_key]
+
+    result = await _search_web_nocache(query, serper_api_key)
+    # Cache successful results or non-critical error strings, but store it
+    _SEARCH_CACHE[cache_key] = result
+    return result
+
+async def _search_web_nocache(query: str, serper_api_key: str = None) -> str:
     if serper_api_key:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -47,6 +62,16 @@ async def read_webpage(url: str) -> str:
     """Read and extract main text from a webpage."""
     if not url.startswith("http"):
         url = "https://" + url
+        
+    if url in _WEBPAGE_CACHE:
+        print(f"  [Cache] Retrieval for webpage content: '{url}'")
+        return _WEBPAGE_CACHE[url]
+
+    result = await _read_webpage_nocache(url)
+    _WEBPAGE_CACHE[url] = result
+    return result
+
+async def _read_webpage_nocache(url: str) -> str:
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -71,3 +96,4 @@ async def read_webpage(url: str) -> str:
             return text
     except Exception as e:
         return f"Failed to read webpage {url}: {e}"
+
